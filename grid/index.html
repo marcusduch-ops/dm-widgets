@@ -12,6 +12,7 @@
       --bg:#f4f6f8;
       --line:#e3e6ea;
       --ink:#2a2f45;
+      --firstcol:260px;   /* fast bredde på ydelses-/type-kolonnen */
     }
     body{font-family:Arial,Helvetica,sans-serif;margin:0;background:var(--bg);color:var(--ink)}
     .wrap{padding:16px}
@@ -25,12 +26,16 @@
     h3{color:var(--navy);font-size:15px;margin:14px 0 6px}
     .panel{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;
       box-shadow:0 1px 2px rgba(0,0,0,.04);margin-bottom:12px}
-    table{border-collapse:collapse;width:100%}
-    th,td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:6px 8px;text-align:center;font-size:14px}
+    /* FAST layout: alle tre tabeller får identiske kolonnebredder, så dagene flugter */
+    table{border-collapse:collapse;width:100%;table-layout:fixed}
+    th,td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:6px 8px;text-align:center;font-size:14px;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     th:last-child,td:last-child{border-right:none}
     th{background:var(--accent);color:#fff;font-weight:600}
-    td:first-child,th:first-child{text-align:left}
-    td input{width:54px;text-align:right;border:1px solid #d5d9df;border-radius:4px;padding:3px 4px}
+    /* første kolonne fast bredde og venstrestillet; dagkolonnerne deler resten ligeligt */
+    th:first-child,td:first-child{text-align:left;width:var(--firstcol);white-space:normal}
+    col.day{width:auto}
+    td input{width:100%;box-sizing:border-box;text-align:right;border:1px solid #d5d9df;border-radius:4px;padding:3px 4px}
     td input:focus{outline:2px solid var(--accent);border-color:var(--accent)}
     .locked{background:#f1f1f1;color:#888}
     .addbtn{background:#fff;border:1px dashed var(--accent);color:var(--accent);border-radius:6px;
@@ -60,10 +65,14 @@
   </div>
 
   <h3>Fravær</h3>
-  <div class="panel"><table id="absence"><thead><tr><th>Type</th><th>Man</th><th>Tir</th><th>Ons</th><th>Tor</th><th>Fre</th><th>Lør</th><th>Søn</th></tr></thead><tbody></tbody></table></div>
+  <div class="panel"><table id="absence">
+    <colgroup><col class="first"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"></colgroup>
+    <thead><tr><th>Type</th><th>Man</th><th>Tir</th><th>Ons</th><th>Tor</th><th>Fre</th><th>Lør</th><th>Søn</th></tr></thead><tbody></tbody></table></div>
 
   <h3>Projekter &amp; interne timer</h3>
-  <div class="panel"><table id="services"><thead><tr><th>Ydelse</th><th>Man</th><th>Tir</th><th>Ons</th><th>Tor</th><th>Fre</th><th>Lør</th><th>Søn</th></tr></thead><tbody></tbody></table></div>
+  <div class="panel"><table id="services">
+    <colgroup><col class="first"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"></colgroup>
+    <thead><tr><th>Ydelse</th><th>Man</th><th>Tir</th><th>Ons</th><th>Tor</th><th>Fre</th><th>Lør</th><th>Søn</th></tr></thead><tbody></tbody></table></div>
   <button class="addbtn" onclick="openCatalog()">+ Tilføj ydelse</button>
   <div id="balance"></div>
  </div>
@@ -105,7 +114,7 @@
     }
     function makeRow(key,name,kind,days){
       var tr=document.createElement("tr"); tr.dataset.key=key; tr.dataset.kind=kind;
-      tr.innerHTML="<td>"+name+"</td>";
+      var td0=document.createElement("td"); td0.innerText=name; td0.title=name; tr.appendChild(td0);
       for(var i=0;i<7;i++){
         var td=document.createElement("td"), inp=document.createElement("input");
         inp.type="number"; inp.step="0.1"; inp.min="0"; inp.max="24";
@@ -140,7 +149,9 @@
     }
     function recalc(){
       applyAbsenceZeroing();
-      var h='<h3>Daglig balance</h3><div class="panel"><table><tr><th></th><th>Man</th><th>Tir</th><th>Ons</th><th>Tor</th><th>Fre</th><th>Lør</th><th>Søn</th></tr><tr><td>Sum</td>';
+      var h='<h3>Daglig balance</h3><div class="panel"><table>'+
+            '<colgroup><col class="first"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"></colgroup>'+
+            '<tr><th></th><th>Man</th><th>Tir</th><th>Ons</th><th>Tor</th><th>Fre</th><th>Lør</th><th>Søn</th></tr><tr><td>Sum</td>';
       for(var i=0;i<7;i++){
         var sum=0;
         document.querySelectorAll("#absence tbody tr, #services tbody tr").forEach(function(tr){ sum+=parseFloat(tr.children[i+1].querySelector("input").value)||0; });
@@ -203,3 +214,4 @@
   </script>
 </body>
 </html>
+
