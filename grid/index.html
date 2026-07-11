@@ -62,7 +62,7 @@
     function initMonday(){ var d=new Date(); var dow=(d.getDay()+6)%7; d.setDate(d.getDate()-dow); monday=d; }
  
     function loadWeek(){
-      api("get_week_grid","GET",{query_params:{userEmail:"",mondayStr:iso(monday)}})
+      api("get_week_grid","POST",{payload:{userEmail:"self",mondayStr:iso(monday)}})
         .then(function(r){ grid=unwrap(r); render(); })
         .catch(function(e){ document.getElementById("balance").innerText="Load error: "+JSON.stringify(e); });
     }
