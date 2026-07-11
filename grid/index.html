@@ -125,7 +125,7 @@
           days.push({date:iso(d),hours:parseFloat(tr.children[i+1].querySelector("input").value)||0}); }
         rows.push({key:tr.dataset.key,name:tr.children[0].innerText,kind:tr.dataset.kind,days:days});
       });
-      api("save_Week","POST",{payload:{userEmail:"",gridJson:JSON.stringify({rows:rows})}})
+      api("saveWeek","POST",{payload:{userEmail:"self",gridJson:JSON.stringify({rows:rows})}})
         .then(function(r){ alert(JSON.stringify(unwrap(r))); loadWeek(); })
         .catch(function(e){ alert("Save error: "+JSON.stringify(e)); });
     }
