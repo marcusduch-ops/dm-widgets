@@ -134,6 +134,8 @@
         if(fr){ for(var i=0;i<7;i++){ var d=new Date(monday); d.setDate(d.getDate()+i);
           var s=(grid.prefillFill||{})[iso(d)]||0; var cell=fr.children[i+1].querySelector("input");
           if(s>0 && !cell.value){ cell.value=s; } } }
+        // brug den enkeltes dagsnorm til balancelinjen
+      if(grid.norm){ NORM = grid.norm; }
       }
       recalc();
     }
