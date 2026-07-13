@@ -5,14 +5,7 @@
   <base target="_top">
   <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
   <style>
-    :root{
-      --accent:#E6335A;        /* crimson accent (matcher Zoho-temaet) */
-      --accent-dark:#C71F45;
-      --navy:#1f2d5a;
-      --bg:#f4f6f8;
-      --line:#e3e6ea;
-      --ink:#2a2f45;
-    }
+    :root{--accent:#E6335A;--accent-dark:#C71F45;--navy:#1f2d5a;--bg:#f4f6f8;--line:#e3e6ea;--ink:#2a2f45}
     body{font-family:Arial,Helvetica,sans-serif;margin:0;background:var(--bg);color:var(--ink)}
     .wrap{padding:18px}
     h2{margin:0 0 14px;color:var(--navy);font-size:20px}
@@ -22,20 +15,19 @@
     select,input[type=date]{padding:6px 8px;border:1px solid #cfd4da;border-radius:6px;font-size:14px}
     .quick button{margin-left:4px;padding:6px 11px;border:1px solid #cfd4da;background:#fff;border-radius:6px;cursor:pointer;font-size:13px}
     .quick button:hover{background:#f0f2f5}
-    #csvBtn{padding:7px 15px;border:none;background:var(--accent);color:#fff;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600}
-    #csvBtn:hover{background:var(--accent-dark)}
-    #csvBtn:disabled{background:#c9ccd2;cursor:default}
-
+    .csvBtn{padding:7px 15px;border:none;background:var(--accent);color:#fff;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600}
+    .csvBtn:hover{background:var(--accent-dark)}
+    .csvBtn:disabled{background:#c9ccd2;cursor:default}
+    .csvBtn.alt{background:#fff;color:var(--accent);border:1px solid var(--accent)}
+    .csvBtn.alt:hover{background:#fbe9ee}
+    .csvBtn.alt:disabled{background:#fff;color:#c9ccd2;border-color:#e0e0e0;cursor:default}
     .summary{display:flex;gap:16px;margin:0 0 16px;flex-wrap:wrap}
-    .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 18px;min-width:140px;
-      box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 18px;min-width:140px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
     .card .lbl{font-size:12px;color:#6b7280;margin-bottom:4px}
     .card .val{font-size:22px;font-weight:700;color:var(--navy)}
     .bar{height:10px;border-radius:5px;background:#eceef1;overflow:hidden;min-width:120px;margin-top:6px}
     .bar>span{display:block;height:100%}
-
-    .panel{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;
-      box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .panel{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04)}
     table{border-collapse:collapse;width:100%}
     th,td{padding:9px 12px;text-align:center;font-size:14px;border-bottom:1px solid var(--line)}
     th{background:var(--accent);color:#fff;font-weight:600}
@@ -65,7 +57,8 @@
       <button onclick="setRange('year')">I år</button>
       <button onclick="setRange('all')">Al tid</button>
     </span>
-    <button id="csvBtn" onclick="downloadCsv()" disabled>&#8681; Download CSV</button>
+    <button id="csvBtn" class="csvBtn" onclick="downloadSummaryCsv()" disabled>&#8681; CSV (oversigt)</button>
+    <button id="csvBtn2" class="csvBtn alt" onclick="downloadDetailCsv()" disabled>&#8681; Detaljeret CSV</button>
   </div>
 
   <div id="summary"></div>
@@ -83,7 +76,7 @@
     }
     function unwrap(r){ var x=(r&&r.result!==undefined)?r.result:(r&&r.data!==undefined?r.data:r); if(typeof x==="string"){try{x=JSON.parse(x);}catch(e){}} return x; }
     function iso(d){ return d.toISOString().slice(0,10); }
-    function fmt(n){ return (Math.round(n*100)/100).toString().replace(".",","); }   // dansk komma
+    function fmt(n){ return (Math.round(n*100)/100).toString().replace(".",","); }
 
     function setRange(kind){
       var now=new Date(), f=null, t=null;
@@ -109,7 +102,7 @@
 
     function loadReport(){
       var pid=document.getElementById("proj").value;
-      if(!pid){ current=null; document.getElementById("csvBtn").disabled=true; document.getElementById("summary").innerHTML=""; document.getElementById("out").className="info"; document.getElementById("out").innerText="Vælg et projekt."; return; }
+      if(!pid){ current=null; setCsvEnabled(false); document.getElementById("summary").innerHTML=""; document.getElementById("out").className="info"; document.getElementById("out").innerText="Vælg et projekt."; return; }
       var from=document.getElementById("from").value||"";
       var to=document.getElementById("to").value||"";
       document.getElementById("out").innerText="Indlæser...";
@@ -117,13 +110,14 @@
         .then(function(r){ render(unwrap(r)); })
         .catch(function(e){ document.getElementById("out").innerText="Fejl ved indlæsning: "+JSON.stringify(e); });
     }
+    function setCsvEnabled(on){ document.getElementById("csvBtn").disabled=!on; document.getElementById("csvBtn2").disabled=!on; }
 
     function barColor(pct){ return pct>100?"#C71F45":(pct>85?"#d97706":"#137333"); }
 
     function render(d){
       var s=d.selected;
-      if(!s){ document.getElementById("out").innerText="Ingen data."; current=null; document.getElementById("csvBtn").disabled=true; return; }
-      current=s; document.getElementById("csvBtn").disabled=false;
+      if(!s){ document.getElementById("out").innerText="Ingen data."; current=null; setCsvEnabled(false); return; }
+      current=s; setCsvEnabled(true);
 
       var pct = s.projectBudget>0 ? (s.projectUsed/s.projectBudget*100) : 0;
       var remCls = s.projectRemaining<0?"over":(pct>85?"warn":"ok");
@@ -142,8 +136,7 @@
         var rpct = row.budget>0 ? (row.used/row.budget*100):0;
         var rcls = row.remaining<0?"over":(rpct>85?"warn":"ok");
         h+='<tr class="wp"><td>'+row.idx+'. '+row.work_package+'</td>'+
-           '<td class="num">'+fmt(row.used)+'</td>'+
-           '<td class="num">'+fmt(row.budget)+'</td>'+
+           '<td class="num">'+fmt(row.used)+'</td><td class="num">'+fmt(row.budget)+'</td>'+
            '<td class="num '+rcls+'">'+fmt(row.remaining)+'</td></tr>';
         if(!row.people || row.people.length===0){
           h+='<tr class="emp"><td class="sub muted">— ingen timer registreret —</td><td></td><td></td><td></td></tr>';
@@ -154,25 +147,32 @@
         }
       });
       h+='</tbody><tfoot><tr><td>I alt</td><td class="num">'+fmt(s.projectUsed)+'</td><td class="num">'+fmt(s.projectBudget)+'</td><td class="num">'+fmt(s.projectRemaining)+'</td></tr></tfoot></table></div>';
-
       var out=document.getElementById("out"); out.className=""; out.innerHTML=h;
     }
 
-    // ---- CSV-eksport af den viste rapport ----
+    // ---------- CSV-hjælpere ----------
     function csvCell(v){
       var s=(v===null||v===undefined)?"":(""+v);
-      if(s.indexOf('"')>-1 || s.indexOf(';')>-1 || s.indexOf(',')>-1 || s.indexOf('\n')>-1){
-        s='"'+s.replace(/"/g,'""')+'"';
-      }
+      if(s.indexOf('"')>-1 || s.indexOf(';')>-1 || s.indexOf(',')>-1 || s.indexOf('\n')>-1){ s='"'+s.replace(/"/g,'""')+'"'; }
       return s;
     }
-    function csvNum(n){ return (""+ (Math.round(n*100)/100)).replace(".",","); }  // dansk komma i CSV
-    function downloadCsv(){
+    function csvNum(n){ return (""+ (Math.round(n*100)/100)).replace(".",","); }
+    function saveCsv(lines, suffix){
+      var from=document.getElementById("from").value||"al-tid";
+      var to=document.getElementById("to").value||"al-tid";
+      var csv="\uFEFF"+lines.join("\r\n");
+      var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+      var fname=(current.project_id||"projekt")+"_"+suffix+"_"+from+"_"+to+".csv";
+      var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=fname;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+
+    // ---------- Oversigt (som før) ----------
+    function downloadSummaryCsv(){
       if(!current) return;
       var from=document.getElementById("from").value||"al tid";
       var to=document.getElementById("to").value||"al tid";
-      var sep=";";                 // dansk Excel bruger semikolon
-      var lines=[];
+      var sep=";", lines=[];
       lines.push(["Projekt",current.project_name].map(csvCell).join(sep));
       lines.push(["Datointerval",from+" til "+to].map(csvCell).join(sep));
       lines.push([]);
@@ -182,24 +182,69 @@
           lines.push([row.idx+". "+row.work_package,"","",csvNum(row.budget),csvNum(row.used),csvNum(row.remaining)].map(csvCell).join(sep));
         } else {
           row.people.forEach(function(pp,i){
-            if(i===0){
-              lines.push([row.idx+". "+row.work_package,pp.name,csvNum(pp.hours),csvNum(row.budget),csvNum(row.used),csvNum(row.remaining)].map(csvCell).join(sep));
-            } else {
-              lines.push([row.idx+". "+row.work_package,pp.name,csvNum(pp.hours),"","",""].map(csvCell).join(sep));
-            }
+            if(i===0){ lines.push([row.idx+". "+row.work_package,pp.name,csvNum(pp.hours),csvNum(row.budget),csvNum(row.used),csvNum(row.remaining)].map(csvCell).join(sep)); }
+            else { lines.push([row.idx+". "+row.work_package,pp.name,csvNum(pp.hours),"","",""].map(csvCell).join(sep)); }
           });
         }
       });
       lines.push([]);
       lines.push(["I ALT","","","",csvNum(current.projectUsed),csvNum(current.projectRemaining)].map(csvCell).join(sep));
-
-      var csv="\uFEFF"+lines.join("\r\n");  // BOM -> æøå vises korrekt i Excel
-      var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
-      var fname=(current.project_id||"projekt")+"_"+from+"_"+to+".csv";
-      var a=document.createElement("a");
-      a.href=URL.createObjectURL(blob); a.download=fname;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      saveCsv(lines,"oversigt");
     }
+
+    // ---------- Detaljeret: månedsindelt, én linje pr. registrering ----------
+    function downloadDetailCsv(){
+      if(!current) return;
+      var from=document.getElementById("from").value||"al tid";
+      var to=document.getElementById("to").value||"al tid";
+      var sep=";", lines=[];
+      var ents=(current.entries||[]).slice();
+      // sortér på måned, dato, medarbejder
+      ents.sort(function(a,b){
+        if(a.month!==b.month) return a.month<b.month?-1:1;
+        if(a.date!==b.date)   return a.date<b.date?-1:1;
+        return (a.employee||"")<(b.employee||"")?-1:1;
+      });
+
+      lines.push(["Projekt",current.project_name].map(csvCell).join(sep));
+      lines.push(["Datointerval",from+" til "+to].map(csvCell).join(sep));
+      lines.push(["Udtrukket",new Date().toISOString().slice(0,10)].map(csvCell).join(sep));
+      lines.push([]);
+
+      // Del 1: månedssummer
+      lines.push(["MÅNEDSOVERSIGT"].map(csvCell).join(sep));
+      lines.push(["Måned","Timer i alt"].map(csvCell).join(sep));
+      var monthTot={};
+      ents.forEach(function(e){ monthTot[e.month]=(monthTot[e.month]||0)+ (e.hours||0); });
+      Object.keys(monthTot).sort().forEach(function(m){
+        lines.push([m,csvNum(monthTot[m])].map(csvCell).join(sep));
+      });
+      lines.push([]);
+
+      // Del 2: alle registreringer (revisionsniveau)
+      lines.push(["ALLE REGISTRERINGER"].map(csvCell).join(sep));
+      lines.push(["Måned","Dato","Medarbejder","Arbejdspakke","Timer"].map(csvCell).join(sep));
+      var runningMonth=null, monthSum=0, grand=0;
+      ents.forEach(function(e){
+        if(runningMonth!==null && e.month!==runningMonth){
+          lines.push([runningMonth,"","","Måned i alt",csvNum(monthSum)].map(csvCell).join(sep));
+          lines.push([]); monthSum=0;
+        }
+        runningMonth=e.month;
+        lines.push([e.month,e.date,e.employee,e.work_package,csvNum(e.hours)].map(csvCell).join(sep));
+        monthSum+= (e.hours||0); grand+= (e.hours||0);
+      });
+      if(runningMonth!==null){ lines.push([runningMonth,"","","Måned i alt",csvNum(monthSum)].map(csvCell).join(sep)); }
+      lines.push([]);
+      lines.push(["","","","I ALT",csvNum(grand)].map(csvCell).join(sep));
+
+      saveCsv(lines,"detaljeret");
+    }
+
+    initProjects();
+  </script>
+</body>
+</html>
 
     initProjects();
   </script>
