@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <base target="_top">
+  <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+  <style>
+    :root{--accent:#E6335A;--accent-dark:#C71F45;--navy:#1f2d5a;--bg:#f4f6f8;--line:#e3e6ea;--ink:#2a2f45}
+    body{font-family:Arial,Helvetica,sans-serif;margin:0;background:var(--bg);color:var(--ink)}
+    .wrap{padding:18px}
+    h2{margin:0 0 4px;color:var(--navy);font-size:20px}
+    h3{color:var(--navy);font-size:16px;margin:18px 0 8px}
+    .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+    label{font-size:13px;color:#555}
+    select,input[type=date],input[type=month]{padding:6px 8px;border:1px solid #cfd4da;border-radius:6px;font-size:14px}
+    .quick button{margin-left:4px;padding:6px 11px;border:1px solid #cfd4da;background:#fff;border-radius:6px;cursor:pointer;font-size:13px}
+    .quick button:hover{background:#f0f2f5}
+    .btn{padding:7px 15px;border:none;background:var(--accent);color:#fff;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600}
+    .btn:hover{background:var(--accent-dark)} .btn:disabled{background:#c9ccd2;cursor:default}
+    .btn.alt{background:#fff;color:var(--accent);border:1px solid var(--accent)} .btn.alt:hover{background:#fbe9ee}
+    .panel{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04);margin-bottom:16px}
+    table{border-collapse:collapse;width:100%}
+    th,td{padding:9px 12px;text-align:center;font-size:14px;border-bottom:1px solid var(--line)}
+    th{background:var(--accent);color:#fff;font-weight:600}
+    td:first-child,th:first-child{text-align:left}
+    tfoot td{font-weight:700;background:#f3f0f5;color:var(--navy)}
+    .num{text-align:right;font-variant-numeric:tabular-nums}
+    .big{font-weight:700;color:var(--navy)}
+    .muted{color:#8a90a0}.info{padding:16px;color:#8a90a0}
+    .radar .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700;margin-right:4px}
+    .tag56{background:#fde7ee;color:var(--accent-dark)}
+    .taglong{background:#fff4e5;color:#b06000}
+    .lockbar{display:flex;gap:10px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:16px}
+  </style>
+</head>
+<body>
+ <div class="wrap">
+  <h2>Fraværs- og lønoverblik</h2>
+  <div class="muted" style="margin-bottom:14px">Til bogholderi/HR. Viser fravær i både dage og timer, refusionsflag og månedslåsning.</div>
+
+  <div class="controls">
+    <label>Medarbejder:
+      <select id="emp" onchange="loadAbsence()"><option value="">Alle</option></select>
+    </label>
+    <label>Fra <input type="date" id="from" onchange="loadAbsence()"></label>
+    <label>Til <input type="date" id="to" onchange="loadAbsence()"></label>
+    <span class="quick">
+      <button onclick="setRange('month')">Denne måned</button>
+      <button onclick="setRange('ferieaar')">Ferieår</button>
+      <button onclick="setRange('year')">Kalenderår</button>
+      <button onclick="setRange('all')">Al tid</button>
+    </span>
+    <button id="csvBtn" class="btn" onclick="downloadCsv()" disabled>&#8681; CSV</button>
+  </div>
+
+  <h3>Fraværsoverblik</h3>
+  <div id="absOut" class="info">Vælger du "Alle" ser du hele organisationen; vælg en person for detaljer. Dage er beregnet ud fra hver medarbejders dagsnorm.</div>
+
+  <h3>Refusions-radar (egen sygdom)</h3>
+  <div id="radarOut" class="info">Indlæser...</div>
+
+  <h3>Månedslåsning</h3>
+  <div class="lockbar">
+    <label>Måned <input type="month" id="lockMonth"></label>
+    <button class="btn alt" onclick="doLock()">Lås måned</button>
+    <span id="lockMsg" class="muted"></span>
+  </div>
+ </div>
+
+  <script>
+    var WORKSPACE="danskemaritime";
+    var absData=null;
+
+    function api(name,method,extra){
+      var cfg={api_name:name,workspace_name:WORKSPACE,http_method:method};
+      if(extra){ for(var k in extra){ cfg[k]=extra[k]; } }
+      return ZOHO.CREATOR.DATA.invokeCustomApi(cfg);
+    }
+    function unwrap(r){ var x=(r&&r.result!==undefined)?r.result:(r&&r.data!==undefined?r.data:r); if(typeof x==="string"){try{x=JSON.parse(x);}catch(e){}} return x; }
+    function iso(d){ return d.toISOString().slice(0,10); }
+    function fmt(n){ return (Math.round(n*100)/100).toString().replace(".",","); }
+
+    function setRange(kind){
+      var now=new Date(), f=null, t=null, y=now.getFullYear();
+      if(kind==="month"){ f=new Date(y,now.getMonth(),1); t=new Date(y,now.getMonth()+1,0); }
+      else if(kind==="year"){ f=new Date(y,0,1); t=new Date(y,11,31); }
+      else if(kind==="ferieaar"){ // 1. sept - 31. aug
+        if(now.getMonth()>=8){ f=new Date(y,8,1); t=new Date(y+1,7,31); }
+        else { f=new Date(y-1,8,1); t=new Date(y,7,31); }
+      }
+      document.getElementById("from").value=f?iso(f):"";
+      document.getElementById("to").value=t?iso(t):"";
+      loadAbsence();
+    }
+
+    function init(){
+      api("get_absence_report","POST",{payload:{empEmail:"",fromStr:"",toStr:""}})
+        .then(function(r){ var d=unwrap(r); var sel=document.getElementById("emp");
+          (d.employees||[]).forEach(function(e){ var o=document.createElement("option"); o.value=e.email; o.text=e.name; sel.add(o); });
+          absData=d; renderAbsence();
+        }).catch(function(e){ document.getElementById("absOut").innerText="Fejl: "+JSON.stringify(e); });
+      loadRadar();
+      var n=new Date(); document.getElementById("lockMonth").value=n.getFullYear()+"-"+("0"+(n.getMonth()+1)).slice(-2);
+    }
+
+    function loadAbsence(){
+      var em=document.getElementById("emp").value;
+      var from=document.getElementById("from").value||"";
+      var to=document.getElementById("to").value||"";
+      document.getElementById("absOut").innerText="Indlæser...";
+      api("get_absence_report","POST",{payload:{empEmail:em,fromStr:from,toStr:to}})
+        .then(function(r){ absData=unwrap(r); renderAbsence(); })
+        .catch(function(e){ document.getElementById("absOut").innerText="Fejl: "+JSON.stringify(e); });
+    }
+
+    function renderAbsence(){
+      if(!absData||!absData.rows){ return; }
+      var rows=absData.rows;
+      document.getElementById("csvBtn").disabled = rows.length===0;
+      if(rows.length===0){ document.getElementById("absOut").innerHTML='<div class="info">Ingen fravær i perioden.</div>'; return; }
+      // typeoverskrifter fra første række
+      var types=rows[0].types.map(function(t){return t.name;});
+      var h='<div class="panel"><table><thead><tr><th>Medarbejder</th>';
+      types.forEach(function(tn){ h+='<th>'+tn+'</th>'; });
+      h+='<th>I alt</th></tr></thead><tbody>';
+      var colTot={}; types.forEach(function(_,i){colTot[i]=0;}); var grand=0;
+      rows.forEach(function(row){
+        h+='<tr><td>'+row.name+' <span class="muted">('+fmt(row.norm)+' t/dag)</span></td>';
+        row.types.forEach(function(t,i){
+          h+='<td class="num">'+(t.hours>0?('<span class="big">'+fmt(t.days)+'</span> d<br><span class="muted">'+fmt(t.hours)+' t</span>'):'—')+'</td>';
+          colTot[i]+=t.days;
+        });
+        h+='<td class="num"><span class="big">'+fmt(row.totalDays)+'</span> d<br><span class="muted">'+fmt(row.totalHours)+' t</span></td></tr>';
+        grand+=row.totalDays;
+      });
+      if(rows.length>1){
+        h+='</tbody><tfoot><tr><td>I alt (dage)</td>';
+        types.forEach(function(_,i){ h+='<td class="num">'+fmt(colTot[i])+'</td>'; });
+        h+='<td class="num">'+fmt(grand)+'</td></tr></tfoot>';
+      } else { h+='</tbody>'; }
+      h+='</table></div>';
+      document.getElementById("absOut").innerHTML=h;
+    }
+
+    function loadRadar(){
+      api("get_refusion_radar","GET",{})
+        .then(function(r){ renderRadar(unwrap(r)); })
+        .catch(function(e){ document.getElementById("radarOut").innerText="Fejl: "+JSON.stringify(e); });
+    }
+    function renderRadar(list){
+      if(!list || list.length===0){ document.getElementById("radarOut").innerHTML='<div class="info">Ingen medarbejdere kræver opmærksomhed lige nu.</div>'; return; }
+      var h='<div class="panel radar"><table><thead><tr><th>Medarbejder</th><th>Flag</th><th>Sygedage (365 d)</th><th>Aktuelt forløb</th><th>Arbejdsgiverperiode slut</th><th>Anmeld senest</th></tr></thead><tbody>';
+      list.forEach(function(x){
+        var tags='';
+        if(x.flag_56){ tags+='<span class="tag tag56">§56-kandidat</span>'; }
+        if(x.flag_longterm){ tags+='<span class="tag taglong">Langtidssygdom</span>'; }
+        h+='<tr><td>'+x.name+'</td><td>'+tags+'</td>'+
+           '<td class="num">'+x.sick_days_365+'</td>'+
+           '<td class="num">'+x.run_days+' d<br><span class="muted">fra '+x.run_start+'</span></td>'+
+           '<td class="num">'+x.agp_end+'</td>'+
+           '<td class="num big">'+x.deadline_5wk+'</td></tr>';
+      });
+      h+='</tbody></table></div>'+
+         '<div class="muted" style="margin-top:-8px;font-size:12px">§56: ≥10 sygedage/år (refusion fra dag 1 muligt). Langtidssygdom: aktuelt forløb ≥21 dage. Datoer er vejledende — verificér i NemRefusion.</div>';
+      document.getElementById("radarOut").innerHTML=h;
+    }
+
+    function doLock(){
+      var m=document.getElementById("lockMonth").value;
+      if(!m){ alert("Vælg en måned"); return; }
+      if(!confirm("Lås alle registreringer for "+m+"? Medarbejdere kan derefter ikke ændre dem.")){ return; }
+      document.getElementById("lockMsg").innerText="Låser...";
+      api("lock_month","POST",{payload:{monthStr:m}})
+        .then(function(r){ document.getElementById("lockMsg").innerText=unwrap(r); })
+        .catch(function(e){ document.getElementById("lockMsg").innerText="Fejl: "+JSON.stringify(e); });
+    }
+
+    // CSV af fraværsoverblikket
+    function csvCell(v){ var s=(v===null||v===undefined)?"":(""+v); if(s.indexOf('"')>-1||s.indexOf(';')>-1||s.indexOf('\n')>-1){s='"'+s.replace(/"/g,'""')+'"';} return s; }
+    function csvNum(n){ return (""+(Math.round(n*100)/100)).replace(".",","); }
+    function downloadCsv(){
+      if(!absData||!absData.rows||absData.rows.length===0) return;
+      var from=document.getElementById("from").value||"al tid";
+      var to=document.getElementById("to").value||"al tid";
+      var types=absData.rows[0].types;
+      var sep=";", lines=[];
+      lines.push(["Fraværsoverblik"].map(csvCell).join(sep));
+      lines.push(["Periode",from+" til "+to].map(csvCell).join(sep));
+      lines.push([]);
+      var hdr=["Medarbejder","Dagsnorm"];
+      types.forEach(function(t){ hdr.push(t.name+" (dage)"); hdr.push(t.name+" (timer)"); });
+      hdr.push("I alt (dage)"); hdr.push("I alt (timer)");
+      lines.push(hdr.map(csvCell).join(sep));
+      absData.rows.forEach(function(row){
+        var line=[row.name, csvNum(row.norm)];
+        row.types.forEach(function(t){ line.push(csvNum(t.days)); line.push(csvNum(t.hours)); });
+        line.push(csvNum(row.totalDays)); line.push(csvNum(row.totalHours));
+        lines.push(line.map(csvCell).join(sep));
+      });
+      var csv="\uFEFF"+lines.join("\r\n");
+      var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+      var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="fravaersoverblik_"+from+"_"+to+".csv";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+
+    init();
+  </script>
+</body>
+</html>
