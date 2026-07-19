@@ -48,12 +48,10 @@
     <button onclick="shiftWeek(1)">Næste &rarr;</button>
     <button class="save" onclick="saveWeek()">Gem uge</button>
   </div>
-
   <h3>Fravær</h3>
   <div class="panel"><table id="absence">
     <colgroup><col class="first"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"></colgroup>
     <thead><tr><th>Type</th><th>Man</th><th>Tir</th><th>Ons</th><th>Tor</th><th>Fre</th><th>Lør</th><th>Søn</th></tr></thead><tbody></tbody></table></div>
-
   <h3>Projekter &amp; interne timer</h3>
   <div class="panel"><table id="services">
     <colgroup><col class="first"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"></colgroup>
@@ -61,7 +59,6 @@
   <button class="addbtn" onclick="openCatalog()">+ Tilføj ydelse</button>
   <div id="balance"></div>
  </div>
-
   <div id="modal"><div class="box">
     <div style="display:flex;justify-content:space-between;align-items:center"><strong>Tilføj en ydelse</strong><span style="cursor:pointer;font-size:20px" onclick="closeCatalog()">&times;</span></div>
     <input id="search" placeholder="Søg..." oninput="renderCatalog()">
@@ -77,11 +74,9 @@
       <button onclick="createNew()">Opret &amp; tilføj</button>
     </div>
   </div></div>
-
   <script>
     var WORKSPACE="danskemaritime", NORM=7.4, TOL=0.05;
     var monday, grid, catalog=[];
-
     function api(name,method,extra){
       var cfg={api_name:name,workspace_name:WORKSPACE,http_method:method};
       if(extra){ for(var k in extra){ cfg[k]=extra[k]; } }
@@ -91,7 +86,6 @@
     function iso(d){ return d.toISOString().slice(0,10); }
     function fmt(n){ return (Math.round(n*100)/100).toString().replace(".",","); }
     function initMonday(){ var d=new Date(); var dow=(d.getDay()+6)%7; d.setDate(d.getDate()-dow); monday=d; }
-
     function loadWeek(){
       api("get_week_grid","POST",{payload:{userEmail:"self",mondayStr:iso(monday)}})
         .then(function(r){ grid=unwrap(r); render(); })
@@ -113,7 +107,14 @@
       // brug den enkeltes dagsnorm til balancelinjen (uden for fillKey-blokken)
       if(grid.norm){ NORM = grid.norm; }
       var at=document.querySelector("#absence tbody"); at.innerHTML="";
-      (grid.absence||[]).forEach(function(a){ at.appendChild(makeRow(a.key,a.name,"absence")); });
+      (grid.absence||[]).forEach(function(a){
+        var tr=makeRow(a.key,a.name,"absence",a.days);
+        if(a.key==="fravaer:ferie" && !grid.callerIsAdmin){
+          tr.querySelectorAll("input").forEach(function(inp){ inp.disabled=true; });
+          tr.title="Ferie registreres via en anmodning \u2013 ikke direkte i skemaet.";
+        }
+        at.appendChild(tr);
+      });
       var st=document.querySelector("#services tbody"); st.innerHTML="";
       (grid.rows||[]).forEach(function(r){ st.appendChild(makeRow(r.key, r.name || r.key, "auto", r.days)); });
       if(grid.fillKey){
@@ -149,7 +150,6 @@
       h+="</tr></table></div>"; document.getElementById("balance").innerHTML=h;
     }
     function shiftWeek(n){ monday.setDate(monday.getDate()+n*7); loadWeek(); }
-
     function saveWeek(){
       var rows=[];
       document.querySelectorAll("#absence tbody tr, #services tbody tr").forEach(function(tr){
@@ -196,7 +196,6 @@
         } else { alert(x.message||"Kunne ikke oprette"); }
       });
     }
-
     initMonday(); loadWeek();
   </script>
 </body>
