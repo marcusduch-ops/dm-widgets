@@ -1,80 +1,52 @@
 <!DOCTYPE html>
 <html lang="da">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Mine ferieanmodninger</title>
-<script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
-<style>
-  :root{
-    --crimson:#E6335A;
-    --navy:#1f2d5a;
-    --bg:#f2f3f6;
-    --card:#ffffff;
-    --line:#e3e6ee;
-    --muted:#6b7280;
-  }
-  *{box-sizing:border-box;}
-  body{
-    margin:0; background:var(--bg);
-    font-family:"Segoe UI",Arial,Helvetica,sans-serif;
-    color:var(--navy); font-size:14px;
-  }
-  .wrap{max-width:820px; margin:0 auto; padding:18px;}
-  h1{font-size:20px; margin:0 0 14px; color:var(--navy);}
-  .card{
-    background:var(--card); border:1px solid var(--line);
-    border-radius:12px; padding:18px; margin-bottom:18px;
-    box-shadow:0 1px 3px rgba(31,45,90,.06);
-  }
-  .card h2{font-size:15px; margin:0 0 14px; color:var(--crimson);}
-  .row{display:flex; gap:14px; flex-wrap:wrap;}
-  .field{display:flex; flex-direction:column; flex:1 1 160px;}
-  label{font-size:12px; font-weight:600; color:var(--muted); margin-bottom:5px;}
-  input,select,textarea{
-    border:1px solid var(--line); border-radius:8px; padding:9px 10px;
-    font:inherit; color:var(--navy); background:#fff;
-  }
-  input:focus,select:focus,textarea:focus{
-    outline:none; border-color:var(--crimson); box-shadow:0 0 0 3px rgba(230,51,90,.12);
-  }
-  textarea{min-height:60px; resize:vertical;}
-  .actions{margin-top:14px; display:flex; align-items:center; gap:12px;}
-  button{
-    background:var(--crimson); color:#fff; border:0; border-radius:8px;
-    padding:10px 18px; font-weight:600; cursor:pointer; font-size:14px;
-  }
-  button:disabled{opacity:.55; cursor:not-allowed;}
-  .msg{font-size:13px;}
-  .msg.ok{color:#1a7f4b;}
-  .msg.err{color:var(--crimson);}
-  table{width:100%; border-collapse:collapse; font-size:13px;}
-  th,td{text-align:left; padding:10px 8px; border-bottom:1px solid var(--line);}
-  th{color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.03em;}
-  .badge{
-    display:inline-block; padding:3px 10px; border-radius:999px;
-    font-size:11px; font-weight:700;
-  }
-  .badge.afventer{background:#fff3d6; color:#8a5a00;}
-  .badge.godkendt{background:#dcf3e4; color:#1a7f4b;}
-  .badge.afvist{background:#fde0e6; color:#b3123c;}
-  .empty{color:var(--muted); padding:14px 0; font-style:italic;}
-  .spin{color:var(--muted); font-size:13px;}
-</style>
+  <meta charset="utf-8" />
+  <base target="_top">
+  <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+  <title>Mine ferieanmodninger</title>
+  <style>
+    :root{--accent:#E6335A;--accent-dark:#C71F45;--navy:#1f2d5a;--bg:#f4f6f8;--card:#fff;--line:#e3e6ea;--ink:#2a2f45;--muted:#6b7280}
+    *{box-sizing:border-box}
+    body{font-family:Arial,Helvetica,sans-serif;margin:0;background:var(--bg);color:var(--ink);font-size:14px}
+    .wrap{max-width:820px;margin:0 auto;padding:18px}
+    h1{font-size:20px;margin:0 0 14px;color:var(--navy)}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:18px;box-shadow:0 1px 3px rgba(31,45,90,.06)}
+    .card h2{font-size:15px;margin:0 0 14px;color:var(--accent)}
+    .row{display:flex;gap:14px;flex-wrap:wrap}
+    .field{display:flex;flex-direction:column;flex:1 1 160px}
+    label{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px}
+    input,select,textarea{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;color:var(--ink);background:#fff}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(230,51,90,.12)}
+    textarea{min-height:60px;resize:vertical}
+    .actions{margin-top:14px;display:flex;align-items:center;gap:12px}
+    button{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 18px;font-weight:600;cursor:pointer;font-size:14px}
+    button:hover{background:var(--accent-dark)}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .msg{font-size:13px}
+    .msg.ok{color:#137333;font-weight:600}
+    .msg.err{color:var(--accent-dark);font-weight:600}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
+    th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+    .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700}
+    .badge.afventer{background:#fff3d6;color:#8a5a00}
+    .badge.godkendt{background:#dcf3e4;color:#137333}
+    .badge.afvist{background:#fde0e6;color:#b3123c}
+    .empty{color:var(--muted);padding:14px 0;font-style:italic}
+    .spin{color:var(--muted);font-size:13px}
+  </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Mine ferieanmodninger</h1>
 
-  <!-- Opret ny anmodning -->
   <div class="card">
     <h2>Ny anmodning</h2>
     <div class="row">
       <div class="field">
         <label for="type">Type</label>
-        <select id="type">
-          <option value="Ferie">Ferie</option>
-        </select>
+        <select id="type"><option value="Ferie">Ferie</option></select>
       </div>
       <div class="field">
         <label for="fromD">Fra dato</label>
@@ -85,121 +57,90 @@
         <input type="date" id="toD" />
       </div>
     </div>
-    <div class="row" style="margin-top:12px;">
-      <div class="field" style="flex:1 1 100%;">
+    <div class="row" style="margin-top:12px">
+      <div class="field" style="flex:1 1 100%">
         <label for="note">Note (valgfri)</label>
         <textarea id="note" placeholder="Fx: sommerferie med familien"></textarea>
       </div>
     </div>
     <div class="actions">
-      <button id="sendBtn">Send anmodning</button>
+      <button id="sendBtn" onclick="sendRequest()">Send anmodning</button>
       <span id="formMsg" class="msg"></span>
     </div>
   </div>
 
-  <!-- Egne anmodninger -->
   <div class="card">
     <h2>Historik</h2>
-    <div id="listWrap">
-      <div class="spin">Henter dine anmodninger…</div>
-    </div>
+    <div id="listWrap"><div class="spin">Henter dine anmodninger…</div></div>
   </div>
 </div>
 
 <script>
-  var WORKSPACE = "danskemaritime";
+  var WORKSPACE="danskemaritime";
 
-  // ---- API-hjaelper (samme moenster som dine oevrige widgets) ----
-  function api(name, method, extra){
-    var cfg = { api_name:name, workspace_name:WORKSPACE, http_method:method };
-    if(extra){ for(var k in extra){ cfg[k] = extra[k]; } }
-    return ZOHO.CREATOR.DATA.invokeCustomApi(cfg);   // v2 SDK, ingen init() noedvendig
+  function api(name,method,extra){
+    var cfg={api_name:name,workspace_name:WORKSPACE,http_method:method};
+    if(extra){ for(var k in extra){ cfg[k]=extra[k]; } }
+    return ZOHO.CREATOR.DATA.invokeCustomApi(cfg);
   }
-  function unwrap(r){
-    var x = (r && r.result !== undefined) ? r.result : (r && r.data !== undefined ? r.data : r);
-    if(typeof x === "string"){ try{ x = JSON.parse(x); }catch(e){} }
-    return x;
-  }
-  function esc(s){ return (s==null?"":String(s)).replace(/[&<>"]/g, function(c){
-    return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
+  function unwrap(r){ var x=(r&&r.result!==undefined)?r.result:(r&&r.data!==undefined?r.data:r); if(typeof x==="string"){try{x=JSON.parse(x);}catch(e){}} return x; }
+  function esc(s){ return (s==null?"":String(s)).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];}); }
 
-  // ---- Hent og vis egne anmodninger ----
   function loadRequests(){
-    var wrap = document.getElementById("listWrap");
-    wrap.innerHTML = '<div class="spin">Henter dine anmodninger…</div>';
-    api("get_my_requests", "GET").then(function(r){
-      var rows = unwrap(r) || [];
-      if(!rows.length){
-        wrap.innerHTML = '<div class="empty">Du har endnu ingen anmodninger.</div>';
-        return;
-      }
-      var html = '<table><thead><tr>' +
-        '<th>Type</th><th>Fra</th><th>Til</th><th>Dage</th><th>Status</th></tr></thead><tbody>';
+    var wrap=document.getElementById("listWrap");
+    wrap.innerHTML='<div class="spin">Henter dine anmodninger…</div>';
+    api("get_my_requests","GET",{}).then(function(r){
+      var rows=unwrap(r)||[];
+      if(!rows.length){ wrap.innerHTML='<div class="empty">Du har endnu ingen anmodninger.</div>'; return; }
+      var html='<table><thead><tr><th>Type</th><th>Fra</th><th>Til</th><th>Dage</th><th>Status</th></tr></thead><tbody>';
       rows.forEach(function(x){
-        var st = (x.status || "afventer").toLowerCase();
-        html += '<tr>' +
-          '<td>' + esc(x.type) + '</td>' +
-          '<td>' + esc(x.from) + '</td>' +
-          '<td>' + esc(x.to) + '</td>' +
-          '<td>' + esc(x.antal) + '</td>' +
-          '<td><span class="badge ' + st + '">' + esc(st) + '</span></td>' +
-          '</tr>';
+        var st=(x.status||"afventer").toLowerCase();
+        html+='<tr><td>'+esc(x.type)+'</td><td>'+esc(x.from)+'</td><td>'+esc(x.to)+'</td><td>'+esc(x.antal)+'</td>'+
+              '<td><span class="badge '+st+'">'+esc(st)+'</span></td></tr>';
       });
-      html += '</tbody></table>';
-      wrap.innerHTML = html;
+      html+='</tbody></table>';
+      wrap.innerHTML=html;
     }).catch(function(e){
-      wrap.innerHTML = '<div class="msg err">Kunne ikke hente anmodninger: ' + esc(e && e.message ? e.message : e) + '</div>';
+      wrap.innerHTML='<div class="msg err">Kunne ikke hente anmodninger: '+esc(e&&e.message?e.message:JSON.stringify(e))+'</div>';
     });
   }
 
-  // ---- Send ny anmodning ----
   function sendRequest(){
-    var btn = document.getElementById("sendBtn");
-    var msg = document.getElementById("formMsg");
-    var type = document.getElementById("type").value;
-    var fromD = document.getElementById("fromD").value;
-    var toD = document.getElementById("toD").value;
-    var note = document.getElementById("note").value;
+    var btn=document.getElementById("sendBtn");
+    var msg=document.getElementById("formMsg");
+    var type=document.getElementById("type").value;
+    var fromD=document.getElementById("fromD").value;
+    var toD=document.getElementById("toD").value;
+    var note=document.getElementById("note").value;
 
-    msg.className = "msg";
-    msg.textContent = "";
+    msg.className="msg"; msg.textContent="";
+    if(!fromD||!toD){ msg.className="msg err"; msg.textContent="Vaelg baade fra- og til-dato."; return; }
+    if(toD<fromD){ msg.className="msg err"; msg.textContent="Til-dato kan ikke ligge foer fra-dato."; return; }
 
-    if(!fromD || !toD){ msg.className="msg err"; msg.textContent="Vaelg baade fra- og til-dato."; return; }
-    if(toD < fromD){ msg.className="msg err"; msg.textContent="Til-dato kan ikke ligge foer fra-dato."; return; }
+    btn.disabled=true; msg.textContent="Sender…";
 
-    btn.disabled = true;
-    msg.textContent = "Sender…";
-
-    // POST med Key and Value -> send som parameters.
-    // ⚠️ Hvis dette fejler: brug PRAECIS samme param-noegle som din saveWeek-widget.
-    api("create_request", "POST", { parameters: {
-      request_type: type,
-      from_date: fromD,
-      to_date: toD,
-      note: note
+    // VIGTIGT: samme wrapper-noegle (payload) som dine oevrige widgets.
+    api("create_request","POST",{payload:{
+      request_type:type, from_date:fromD, to_date:toD, note:note
     }}).then(function(r){
-      var res = unwrap(r) || {};
+      var res=unwrap(r)||{};
       if(res.ok){
-        msg.className = "msg ok";
-        msg.textContent = "Anmodning sendt (" + res.antal + " dage). Afventer godkendelse.";
-        document.getElementById("note").value = "";
+        msg.className="msg ok";
+        msg.textContent="Anmodning sendt ("+res.antal+" dage). Afventer godkendelse.";
+        document.getElementById("note").value="";
         loadRequests();
       } else {
-        msg.className = "msg err";
-        msg.textContent = "Fejl: " + esc(res.error || "ukendt");
+        msg.className="msg err";
+        msg.textContent="Fejl: "+esc(res.error||"ukendt");
       }
     }).catch(function(e){
-      msg.className = "msg err";
-      msg.textContent = "Kald fejlede: " + esc(e && e.message ? e.message : e);
-    }).then(function(){ btn.disabled = false; });
+      msg.className="msg err";
+      msg.textContent="Kald fejlede: "+esc(e&&e.message?e.message:JSON.stringify(e));
+    }).then(function(){ btn.disabled=false; });
   }
 
-  document.getElementById("sendBtn").addEventListener("click", sendRequest);
-
-  // ---- Init ----
   function init(){ loadRequests(); }
-  if(window.ZOHO && ZOHO.CREATOR){ init(); }
-  else { window.addEventListener("load", init); }
+  if(window.ZOHO && ZOHO.CREATOR){ init(); } else { window.addEventListener("load",init); }
 </script>
 </body>
 </html>
