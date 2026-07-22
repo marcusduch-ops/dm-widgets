@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <base target="_top">
+  <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+  <title>Feriefridage</title>
+  <style>
+    :root{--accent:#E6335A;--accent-dark:#C71F45;--navy:#1f2d5a;--bg:#f4f6f8;--card:#fff;--line:#e3e6ea;--ink:#2a2f45;--muted:#6b7280}
+    *{box-sizing:border-box}
+    body{font-family:Arial,Helvetica,sans-serif;margin:0;background:var(--bg);color:var(--ink);font-size:14px}
+    .wrap{max-width:760px;margin:0 auto;padding:18px}
+    h1{font-size:20px;margin:0 0 4px;color:var(--navy)}
+    .sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:18px;box-shadow:0 1px 3px rgba(31,45,90,.06)}
+    .card h2{font-size:15px;margin:0 0 14px;color:var(--accent)}
+    .row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+    .field{display:flex;flex-direction:column;flex:1 1 150px}
+    label{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px}
+    input,select{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;color:var(--ink);background:#fff}
+    input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(230,51,90,.12)}
+    .scope{display:flex;gap:16px;margin:4px 0 2px}
+    .scope label{display:flex;align-items:center;gap:6px;font-weight:600;color:var(--ink);font-size:13px;margin:0}
+    button{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 16px;font-weight:600;cursor:pointer;font-size:14px}
+    button:hover{background:var(--accent-dark)}
+    button.ghost{background:#fff;color:var(--accent);border:1px solid var(--accent)}
+    button.ghost:hover{background:#fbe9ee}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .msg{font-size:13px;margin-top:10px}
+    .msg.ok{color:#137333;font-weight:600}
+    .msg.err{color:var(--accent-dark);font-weight:600}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
+    th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+    td.act{text-align:right}
+    .rm{background:none;color:var(--accent-dark);border:none;padding:4px 8px;cursor:pointer;font-weight:600;font-size:12px}
+    .rm:hover{text-decoration:underline}
+    .empty{color:var(--muted);padding:12px 0;font-style:italic}
+    .spin{color:var(--muted);font-size:13px}
+    .denied{background:#fde0e6;color:#b3123c;padding:14px 16px;border-radius:10px;font-weight:600}
+    .hr{height:1px;background:var(--line);margin:16px 0}
+    .hint{color:var(--muted);font-size:12px;margin-top:4px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Feriefridage</h1>
+  <p class="sub" id="yearsub">Kun for ledelse/administratorer</p>
+
+  <div id="app" style="display:none">
+
+    <!-- Laeg ind -->
+    <div class="card">
+      <h2>Læg feriefridag ind</h2>
+      <div class="scope">
+        <label><input type="radio" name="scope" value="all" checked onchange="toggleScope()"> Alle aktive medarbejdere</label>
+        <label><input type="radio" name="scope" value="one" onchange="toggleScope()"> Én medarbejder</label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div class="field" id="empField" style="display:none;flex:1 1 100%">
+          <label for="emp">Medarbejder</label>
+          <select id="emp"></select>
+        </div>
+        <div class="field">
+          <label for="ffDate">Dato</label>
+          <input type="date" id="ffDate" />
+        </div>
+        <div class="field" style="flex:2 1 220px">
+          <label for="ffNote">Note (valgfri)</label>
+          <input type="text" id="ffNote" placeholder="Fx: Mellem jul og nytår" />
+        </div>
+        <div class="field" style="flex:0 0 auto">
+          <label>&nbsp;</label>
+          <button id="addBtn" onclick="addDay()">+ Læg ind</button>
+        </div>
+      </div>
+      <div class="hint" id="oneHint" style="display:none">Tip: brug knappen nederst for at give en nyansat alle årets datoer på én gang.</div>
+      <div id="addMsg" class="msg"></div>
+    </div>
+
+    <!-- Oversigt -->
+    <div class="card">
+      <h2>Årets feriefridage (<span id="yearLbl">…</span>)</h2>
+      <div id="listWrap"><div class="spin">Henter…</div></div>
+      <div class="hr"></div>
+      <div class="row" style="align-items:flex-end">
+        <div class="field" style="flex:1 1 220px">
+          <label for="emp2">Anvend alle årets datoer for nyansat</label>
+          <select id="emp2"></select>
+        </div>
+        <div class="field" style="flex:0 0 auto">
+          <label>&nbsp;</label>
+          <button class="ghost" id="applyYearBtn" onclick="applyYear()">Anvend for medarbejder</button>
+        </div>
+        <div class="field" style="flex:0 0 auto">
+          <label>&nbsp;</label>
+          <button id="mailBtn" onclick="sendMail()">📧 Send besked til alle</button>
+        </div>
+      </div>
+      <div id="listMsg" class="msg"></div>
+    </div>
+
+  </div>
+
+  <div id="deniedBox" class="denied" style="display:none">
+    Denne side er kun tilgængelig for ledelse/administratorer.
+  </div>
+</div>
+
+<script>
+  var WORKSPACE="danskemaritime";
+  var employeesCache=[];
+
+  function api(name,method,extra){
+    var cfg={api_name:name,workspace_name:WORKSPACE,http_method:method};
+    if(extra){ for(var k in extra){ cfg[k]=extra[k]; } }
+    return ZOHO.CREATOR.DATA.invokeCustomApi(cfg);
+  }
+  function unwrap(r){ var x=(r&&r.result!==undefined)?r.result:(r&&r.data!==undefined?r.data:r); if(typeof x==="string"){try{x=JSON.parse(x);}catch(e){}} return x; }
+  function esc(s){ return (s==null?"":String(s)).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];}); }
+  function daDate(iso){ if(!iso) return ""; var p=iso.split("-"); return p[2]+"-"+p[1]+"-"+p[0]; }
+
+  function toggleScope(){
+    var one=document.querySelector('input[name="scope"]:checked').value==="one";
+    document.getElementById("empField").style.display=one?"flex":"none";
+    document.getElementById("oneHint").style.display=one?"block":"none";
+  }
+
+  function fillEmployees(){
+    api("get_employees_list","GET",{}).then(function(r){
+      employeesCache=unwrap(r)||[];
+      var opts='<option value="">— vælg —</option>';
+      employeesCache.forEach(function(e){ opts+='<option value="'+esc(e.id)+'">'+esc(e.name)+'</option>'; });
+      document.getElementById("emp").innerHTML=opts;
+      document.getElementById("emp2").innerHTML=opts;
+    });
+  }
+
+  function loadDates(){
+    var wrap=document.getElementById("listWrap");
+    wrap.innerHTML='<div class="spin">Henter…</div>';
+    api("get_feriefridage","GET",{}).then(function(r){
+      var d=unwrap(r)||{};
+      if(!d.isAdmin){
+        document.getElementById("app").style.display="none";
+        document.getElementById("deniedBox").style.display="block";
+        return;
+      }
+      document.getElementById("app").style.display="block";
+      document.getElementById("yearLbl").textContent=d.year||"";
+      document.getElementById("yearsub").textContent="Ledelsen vælger husets fælles feriefridage for året";
+      var rows=d.dates||[];
+      if(!rows.length){ wrap.innerHTML='<div class="empty">Ingen feriefridage lagt ind endnu.</div>'; return; }
+      var html='<table><thead><tr><th>Dato</th><th>Note</th><th></th></tr></thead><tbody>';
+      rows.forEach(function(x){
+        html+='<tr><td>'+esc(daDate(x.date))+'</td><td>'+esc(x.note)+'</td>'+
+              '<td class="act"><button class="rm" onclick="removeDay(\''+esc(x.id)+'\')">fjern</button></td></tr>';
+      });
+      html+='</tbody></table>';
+      wrap.innerHTML=html;
+    }).catch(function(e){
+      wrap.innerHTML='<div class="msg err">Fejl: '+esc(e&&e.message?e.message:JSON.stringify(e))+'</div>';
+    });
+  }
+
+  function addDay(){
+    var btn=document.getElementById("addBtn");
+    var msg=document.getElementById("addMsg");
+    var scope=document.querySelector('input[name="scope"]:checked').value;
+    var date=document.getElementById("ffDate").value;
+    var note=document.getElementById("ffNote").value;
+    var empId=document.getElementById("emp").value;
+    msg.className="msg"; msg.textContent="";
+    if(!date){ msg.className="msg err"; msg.textContent="Vælg en dato."; return; }
+    if(scope==="one" && !empId){ msg.className="msg err"; msg.textContent="Vælg en medarbejder."; return; }
+    btn.disabled=true; msg.textContent="Gemmer…";
+    api("apply_feriefridag","POST",{payload:{ff_date:date,ff_note:note,scope:scope,emp_id:empId}}).then(function(r){
+      var res=unwrap(r)||{};
+      if(res.ok){
+        msg.className="msg ok";
+        msg.textContent="Lagt ind for "+res.created+" medarbejder(e)"+(res.skipped?(" ("+res.skipped+" havde den allerede)"):"")+".";
+        document.getElementById("ffNote").value="";
+        loadDates();
+      } else { msg.className="msg err"; msg.textContent="Fejl: "+esc(res.error||"ukendt"); }
+    }).catch(function(e){
+      msg.className="msg err"; msg.textContent="Kald fejlede: "+esc(e&&e.message?e.message:JSON.stringify(e));
+    }).then(function(){ btn.disabled=false; });
+  }
+
+  function removeDay(id){
+    if(!confirm("Fjern denne feriefridag for alle medarbejdere?")) return;
+    var msg=document.getElementById("listMsg");
+    msg.className="msg"; msg.textContent="Fjerner…";
+    api("remove_feriefridag","POST",{payload:{ff_id:id}}).then(function(r){
+      var res=unwrap(r)||{};
+      if(res.ok){ msg.className="msg ok"; msg.textContent="Fjernet."; loadDates(); }
+      else { msg.className="msg err"; msg.textContent="Fejl: "+esc(res.error||"ukendt"); }
+    }).catch(function(e){
+      msg.className="msg err"; msg.textContent="Kald fejlede: "+esc(e&&e.message?e.message:JSON.stringify(e));
+    });
+  }
+
+  function applyYear(){
+    var btn=document.getElementById("applyYearBtn");
+    var msg=document.getElementById("listMsg");
+    var empId=document.getElementById("emp2").value;
+    msg.className="msg"; msg.textContent="";
+    if(!empId){ msg.className="msg err"; msg.textContent="Vælg en medarbejder."; return; }
+    btn.disabled=true; msg.textContent="Anvender…";
+    api("apply_year_to_employee","POST",{payload:{emp_id:empId}}).then(function(r){
+      var res=unwrap(r)||{};
+      if(res.ok){ msg.className="msg ok"; msg.textContent="Tilføjet "+res.created+" dag(e)"+(res.skipped?(" ("+res.skipped+" fandtes)"):"")+"."; }
+      else { msg.className="msg err"; msg.textContent="Fejl: "+esc(res.error||"ukendt"); }
+    }).catch(function(e){
+      msg.className="msg err"; msg.textContent="Kald fejlede: "+esc(e&&e.message?e.message:JSON.stringify(e));
+    }).then(function(){ btn.disabled=false; });
+  }
+
+  function sendMail(){
+    var btn=document.getElementById("mailBtn");
+    var msg=document.getElementById("listMsg");
+    if(!confirm("Send en mail til alle aktive medarbejdere med årets feriefridage?")) return;
+    btn.disabled=true; msg.className="msg"; msg.textContent="Sender…";
+    api("send_feriefridag_mail","POST",{payload:{dummy:"self"}}).then(function(r){
+      var res=unwrap(r)||{};
+      if(res.ok){ msg.className="msg ok"; msg.textContent="Sendt til "+res.sent+" medarbejdere."; }
+      else { msg.className="msg err"; msg.textContent="Fejl: "+esc(res.error||"ukendt"); }
+    }).catch(function(e){
+      msg.className="msg err"; msg.textContent="Kald fejlede: "+esc(e&&e.message?e.message:JSON.stringify(e));
+    }).then(function(){ btn.disabled=false; });
+  }
+
+  function init(){ fillEmployees(); loadDates(); }
+  if(window.ZOHO && ZOHO.CREATOR){ init(); } else { window.addEventListener("load",init); }
+</script>
+</body>
+</html>
