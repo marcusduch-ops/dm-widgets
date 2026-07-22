@@ -2,169 +2,45 @@
 <html>
 <head>
   <meta charset="utf-8">
+  <title>whoAmI (OAuth2) smoke test</title>
   <base target="_top">
   <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
   <style>
-    body{font-family:Arial,Helvetica,sans-serif;margin:16px}
-    table{border-collapse:collapse;width:100%;margin-bottom:12px}
-    th,td{border:1px solid #ddd;padding:4px;text-align:center}
-    td:first-child{text-align:left}
-    td input{width:52px;text-align:right}
-    .head{display:flex;gap:8px;align-items:center;margin-bottom:12px}
-    .save{margin-left:auto;background:#1a73e8;color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer}
-    .ok{color:#137333;font-weight:600}.under{color:#e37400;font-weight:600}.over{color:#c5221f;font-weight:600}
-    .locked{background:#f1f1f1;color:#888}
-    #modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);align-items:center;justify-content:center}
-    #modal .box{background:#fff;padding:18px;border-radius:8px;width:420px;max-height:80vh;overflow:auto;margin:auto}
+    body{font-family:Arial,Helvetica,sans-serif;margin:24px;font-size:15px}
+    button{background:#1a73e8;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:15px}
+    pre{background:#f6f8fa;border:1px solid #ddd;padding:12px;border-radius:4px;white-space:pre-wrap;word-break:break-all}
+    .hint{color:#555}
   </style>
 </head>
 <body>
-  <div class="head">
-    <button onclick="shiftWeek(-1)">&larr; Prev</button>
-    <span id="weeklabel">Week ...</span>
-    <button onclick="shiftWeek(1)">Next &rarr;</button>
-    <button class="save" onclick="saveWeek()">Save week</button>
-  </div>
-  <h3>Absence</h3>
-  <table id="absence"><thead><tr><th>Type</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead><tbody></tbody></table>
-  <h3>Projects &amp; internal</h3>
-  <table id="services"><thead><tr><th>Service</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead><tbody></tbody></table>
-  <button onclick="openCatalog()">+ Add service</button>
-  <div id="balance"></div>
- 
-  <div id="modal"><div class="box">
-    <div style="display:flex;justify-content:space-between"><strong>Add a service</strong><span style="cursor:pointer" onclick="closeCatalog()">&times;</span></div>
-    <input id="search" placeholder="Search..." oninput="renderCatalog()" style="width:100%;padding:6px;margin:6px 0">
-    <div id="catalog"></div><hr>
-    <button onclick="document.getElementById('createnew').style.display='block'">+ Create new</button>
-    <div id="createnew" style="display:none">
-      <select id="newtype" style="width:100%;padding:6px;margin:4px 0">
-        <option value="workpackage">Work package (needs project key)</option>
-        <option value="category">Internal category</option>
-      </select>
-      <input id="newname" placeholder="Name" style="width:100%;padding:6px;margin:4px 0">
-      <input id="newcode" placeholder="Project key (for work package)" style="width:100%;padding:6px;margin:4px 0">
-      <button onclick="createNew()">Create &amp; add</button>
-    </div>
-  </div></div>
- 
+  <h3>Stage 1 (OAuth2, external) — Who am I?</h3>
+  <p class="hint">Click the button. The box shows what the server returns for <code>zoho.loginuser</code>.
+     With OAuth2 + a logged-in session, this should be YOUR email, not "Public".</p>
+  <button onclick="whoami()">Who am I?</button>
+  <pre id="out">(no result yet)</pre>
+
   <script>
-    var WORKSPACE="danskemaritime", NORM=7.4, TOL=0.05;
-    var monday, grid, catalog=[];
- 
-    function api(name,method,extra){
-      var cfg={api_name:name,workspace_name:WORKSPACE,http_method:method};
-      if(extra){ for(var k in extra){ cfg[k]=extra[k]; } }
-      return ZOHO.CREATOR.DATA.invokeCustomApi(cfg);
-    }
-    function unwrap(r){ var x=(r&&r.result!==undefined)?r.result:(r&&r.data!==undefined?r.data:r); if(typeof x==="string"){try{x=JSON.parse(x);}catch(e){}} return x; }
-    function iso(d){ return d.toISOString().slice(0,10); }
-    function initMonday(){ var d=new Date(); var dow=(d.getDay()+6)%7; d.setDate(d.getDate()-dow); monday=d; }
- 
-    function loadWeek(){
-      api("get_week_grid","GET",{query_params:{userEmail:"",mondayStr:iso(monday)}})
-        .then(function(r){ grid=unwrap(r); render(); })
-        .catch(function(e){ document.getElementById("balance").innerText="Load error: "+JSON.stringify(e); });
-    }
-    function makeRow(key,name,kind,days){
-      var tr=document.createElement("tr"); tr.dataset.key=key; tr.dataset.kind=kind;
-      tr.innerHTML="<td>"+name+"</td>";
-      for(var i=0;i<7;i++){
-        var td=document.createElement("td"), inp=document.createElement("input");
-        inp.type="number"; inp.step="0.1"; inp.min="0"; inp.max="24";
-        if(days&&days[i]){ inp.value=days[i].hours||""; if(days[i].locked){inp.disabled=true; td.className="locked";} }
-        inp.oninput=recalc; td.appendChild(inp); tr.appendChild(td);
+    var WORKSPACE = "danskemaritime";
+    var API_NAME  = "whoAmI";
+
+    function whoami(){
+      document.getElementById("out").innerText = "calling...";
+      if(typeof ZOHO === "undefined" || !ZOHO.CREATOR){
+        document.getElementById("out").innerText = "SDK not loaded — check the widget is opened inside a Creator page.";
+        return;
       }
-      return tr;
-    }
-    function render(){
-      document.getElementById("weeklabel").innerText="Week of "+iso(monday);
-      var at=document.querySelector("#absence tbody"); at.innerHTML="";
-      (grid.absence||[]).forEach(function(a){ at.appendChild(makeRow(a.key,a.name,"absence")); });
-      var st=document.querySelector("#services tbody"); st.innerHTML="";
-      (grid.rows||[]).forEach(function(r){ st.appendChild(makeRow(r.key,r.key,"auto",r.days)); });
-      // client prefill on empty weekdays (suggestion only)
-      if(grid.fillKey){
-        var fr=Array.from(document.querySelectorAll("#services tbody tr")).find(function(tr){return tr.dataset.key===grid.fillKey;});
-        if(fr){ for(var i=0;i<7;i++){ var d=new Date(monday); d.setDate(d.getDate()+i);
-          var s=(grid.prefillFill||{})[iso(d)]||0; var cell=fr.children[i+1].querySelector("input");
-          if(s>0 && !cell.value){ cell.value=s; } } }
-      }
-      recalc();
-    }
-    function applyAbsenceZeroing(){
-      if(!grid||!grid.fillKey) return;
-      var fr=Array.from(document.querySelectorAll("#services tbody tr")).find(function(tr){return tr.dataset.key===grid.fillKey;});
-      if(!fr) return;
-      for(var i=0;i<7;i++){
-        var absSum=0;
-        document.querySelectorAll("#absence tbody tr").forEach(function(tr){ absSum+=parseFloat(tr.children[i+1].querySelector("input").value)||0; });
-        if(absSum>=7){ fr.children[i+1].querySelector("input").value=""; }
-      }
-    }
-    function recalc(){
-      applyAbsenceZeroing();
-      var html="<h3>Daily balance</h3><table><tr><th></th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr><tr><td>Sum</td>";
-      for(var i=0;i<7;i++){
-        var sum=0;
-        document.querySelectorAll("#absence tbody tr, #services tbody tr").forEach(function(tr){ sum+=parseFloat(tr.children[i+1].querySelector("input").value)||0; });
-        var cls=Math.abs(sum-NORM)<=TOL?"ok":(sum<NORM?"under":"over");
-        var mark=Math.abs(sum-NORM)<=TOL?("\u2713 "+sum.toFixed(2)):(sum.toFixed(2)+" ("+(sum-NORM>0?"+":"")+(sum-NORM).toFixed(2)+")");
-        html+="<td class='"+cls+"'>"+mark+"</td>";
-      }
-      html+="</tr></table>"; document.getElementById("balance").innerHTML=html;
-    }
-    function shiftWeek(n){ monday.setDate(monday.getDate()+n*7); loadWeek(); }
- 
-    // ---- save + catalog (Pass B active) ----
-    function saveWeek(){
-      var rows=[];
-      document.querySelectorAll("#absence tbody tr, #services tbody tr").forEach(function(tr){
-        var days=[];
-        for(var i=0;i<7;i++){ var d=new Date(monday); d.setDate(d.getDate()+i);
-          days.push({date:iso(d),hours:parseFloat(tr.children[i+1].querySelector("input").value)||0}); }
-        rows.push({key:tr.dataset.key,name:tr.children[0].innerText,kind:tr.dataset.kind,days:days});
-      });
-      api("saveWeek","POST",{payload:{userEmail:"self",gridJson:JSON.stringify({rows:rows})}})
-        .then(function(r){ alert(JSON.stringify(unwrap(r))); loadWeek(); })
-        .catch(function(e){ alert("Save error: "+JSON.stringify(e)); });
-    }
-    function openCatalog(){
-      document.getElementById("modal").style.display="flex";
-      document.getElementById("createnew").style.display="none";
-      document.getElementById("search").value="";
-      api("get_active_services","GET",{}).then(function(r){ catalog=unwrap(r)||[]; renderCatalog(); });
-    }
-    function closeCatalog(){ document.getElementById("modal").style.display="none"; }
-    function renderCatalog(){
-      var q=(document.getElementById("search").value||"").toLowerCase();
-      var list=document.getElementById("catalog"); list.innerHTML="";
-      var already=new Set(Array.from(document.querySelectorAll("#services tbody tr")).map(function(tr){return tr.dataset.key;}));
-      catalog.filter(function(x){return x.name.toLowerCase().indexOf(q)>-1||x.key.toLowerCase().indexOf(q)>-1;})
-        .forEach(function(x){
-          var row=document.createElement("div"); row.style.cssText="display:flex;justify-content:space-between;padding:6px;border-bottom:1px solid #eee";
-          var lbl=document.createElement("span"); lbl.innerText=x.name+" ("+x.key+")";
-          var btn=document.createElement("button");
-          if(already.has(x.key)){ btn.innerText="Added"; btn.disabled=true; } else { btn.innerText="Add"; btn.onclick=function(){addToGrid(x);}; }
-          row.appendChild(lbl); row.appendChild(btn); list.appendChild(row);
-        });
-    }
-    function addToGrid(x){ document.querySelector("#services tbody").appendChild(makeRow(x.key,x.name,x.kind)); renderCatalog(); recalc(); }
-    function createNew(){
-      var type=document.getElementById("newtype").value;
-      var name=document.getElementById("newname").value.trim();
-      var code=document.getElementById("newcode").value.trim();
-      if(!name){ alert("Name required"); return; }
-      api("create_service","POST",{payload:{type:type,name:name,code:code}}).then(function(r){
-        var x=unwrap(r);
-        if(x.status==="OK"){ catalog.push(x); addToGrid(x);
-          document.getElementById("newname").value=""; document.getElementById("newcode").value="";
-          document.getElementById("createnew").style.display="none";
-        } else { alert(x.message||"Could not create"); }
+      ZOHO.CREATOR.DATA.invokeCustomApi({
+        api_name:       API_NAME,
+        workspace_name: WORKSPACE,
+        http_method:    "GET"
+      })
+      .then(function(resp){
+        document.getElementById("out").innerText = JSON.stringify(resp, null, 2);
+      })
+      .catch(function(err){
+        document.getElementById("out").innerText = "ERROR:\n" + JSON.stringify(err, null, 2);
       });
     }
- 
-    initMonday(); loadWeek();
   </script>
 </body>
 </html>
