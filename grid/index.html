@@ -134,17 +134,17 @@
         document.querySelectorAll("#absence tbody tr").forEach(function(tr){ absSum+=parseFloat(tr.children[i+1].querySelector("input").value)||0; });
         if(absSum>=7){ fr.children[i+1].querySelector("input").value=""; }
       }
-    }
-    function recalc(){
+function recalc(){
       applyAbsenceZeroing();
       var h='<h3>Daglig balance</h3><div class="panel"><table>'+
             '<colgroup><col class="first"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"></colgroup>'+
             '<tr><th></th><th>Man</th><th>Tir</th><th>Ons</th><th>Tor</th><th>Fre</th><th>Lør</th><th>Søn</th></tr><tr><td>Sum</td>';
       for(var i=0;i<7;i++){
+        var dayNorm = (i>=5) ? 0 : NORM;   // weekend: udgangspunkt = 0 timer
         var sum=0;
         document.querySelectorAll("#absence tbody tr, #services tbody tr").forEach(function(tr){ sum+=parseFloat(tr.children[i+1].querySelector("input").value)||0; });
-        var cls=Math.abs(sum-NORM)<=TOL?"ok":(sum<NORM?"under":"over");
-        var mark=Math.abs(sum-NORM)<=TOL?("\u2713 "+fmt(sum)):(fmt(sum)+" ("+(sum-NORM>0?"+":"")+fmt(sum-NORM)+")");
+        var cls=Math.abs(sum-dayNorm)<=TOL?"ok":(sum<dayNorm?"under":"over");
+        var mark=Math.abs(sum-dayNorm)<=TOL?("\u2713 "+fmt(sum)):(fmt(sum)+" ("+(sum-dayNorm>0?"+":"")+fmt(sum-dayNorm)+")");
         h+="<td class='"+cls+"'>"+mark+"</td>";
       }
       h+="</tr></table></div>"; document.getElementById("balance").innerHTML=h;
