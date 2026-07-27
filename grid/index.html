@@ -46,6 +46,7 @@
     <button onclick="shiftWeek(-1)">&larr; Forrige</button>
     <span id="weeklabel">Uge ...</span>
     <button onclick="shiftWeek(1)">Næste &rarr;</button>
+    <button onclick="thisWeek()">I dag</button>
     <button class="save" onclick="saveWeek()">Gem uge</button>
   </div>
   <h3>Fravær</h3>
@@ -151,6 +152,7 @@
       h+="</tr></table></div>"; document.getElementById("balance").innerHTML=h;
     }
     function shiftWeek(n){ monday.setDate(monday.getDate()+n*7); loadWeek(); }
+    function thisWeek(){ initMonday(); loadWeek(); }
     function saveWeek(){
       var rows=[];
       document.querySelectorAll("#absence tbody tr, #services tbody tr").forEach(function(tr){
