@@ -134,7 +134,8 @@
         document.querySelectorAll("#absence tbody tr").forEach(function(tr){ absSum+=parseFloat(tr.children[i+1].querySelector("input").value)||0; });
         if(absSum>=7){ fr.children[i+1].querySelector("input").value=""; }
       }
-function recalc(){
+    }
+    function recalc(){
       applyAbsenceZeroing();
       var h='<h3>Daglig balance</h3><div class="panel"><table>'+
             '<colgroup><col class="first"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"></colgroup>'+
