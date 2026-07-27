@@ -68,14 +68,10 @@
     <div style="display:flex;justify-content:space-between;align-items:center"><strong>Tilf&oslash;j en ydelse</strong><span style="cursor:pointer;font-size:20px" onclick="closeCatalog()">&times;</span></div>
     <input id="search" placeholder="S&oslash;g..." oninput="renderCatalog()">
     <div id="catalog"></div><hr>
-    <button onclick="document.getElementById('createnew').style.display='block'">+ Opret ny</button>
+    <p style="font-size:12px;color:#8a90a0;margin:6px 0">Nye projekter og arbejdspakker oprettes i modulet &bdquo;Projekter &amp; arbejdspakker&ldquo;. Her kan du oprette nye <strong>interne kategorier</strong>.</p>
+    <button onclick="document.getElementById('createnew').style.display='block'">+ Opret ny intern kategori</button>
     <div id="createnew" style="display:none">
-      <select id="newtype">
-        <option value="workpackage">Arbejdspakke (kr&aelig;ver projektn&oslash;gle)</option>
-        <option value="category">Intern kategori</option>
-      </select>
-      <input id="newname" placeholder="Navn">
-      <input id="newcode" placeholder="Projektn&oslash;gle (til arbejdspakke)">
+      <input id="newname" placeholder="Navn p&aring; intern kategori">
       <button onclick="createNew()">Opret &amp; tilf&oslash;j</button>
     </div>
   </div></div>
@@ -243,14 +239,12 @@
         .catch(function(e){ alert("Kunne ikke fjerne: "+JSON.stringify(e)); });
     }
     function createNew(){
-      var type=document.getElementById("newtype").value;
       var name=document.getElementById("newname").value.trim();
-      var code=document.getElementById("newcode").value.trim();
       if(!name){ alert("Navn er p\u00e5kr\u00e6vet"); return; }
-      api("create_service","POST",{payload:{type:type,name:name,code:code}}).then(function(r){
+      api("create_service","POST",{payload:{type:"category",name:name,code:""}}).then(function(r){
         var x=unwrap(r);
         if(x.status==="OK"){ addToGrid(x);
-          document.getElementById("newname").value=""; document.getElementById("newcode").value="";
+          document.getElementById("newname").value="";
           document.getElementById("createnew").style.display="none";
         } else { alert(x.message||"Kunne ikke oprette"); }
       });
