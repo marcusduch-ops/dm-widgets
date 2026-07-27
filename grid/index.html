@@ -26,7 +26,7 @@
     td input:focus{outline:2px solid var(--accent);border-color:var(--accent)}
     .locked{background:#f1f1f1;color:#888}
     tr.section td{background:#eef1f6;color:var(--navy);font-weight:700;text-align:left;font-size:13px;border-right:none}
-    td:first-child span.svcname{display:inline-block;max-width:calc(var(--firstcol) - 32px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+    td:first-child span.svcname{display:inline-block;max-width:calc(var(--firstcol) - 32px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;line-height:1.2}
     button.rmrow{float:right;background:none;border:none;color:var(--accent-dark);cursor:pointer;font-size:16px;line-height:1;padding:0 2px;visibility:hidden}
     tr.drow:hover button.rmrow{visibility:visible}
     .addbtn{background:#fff;border:1px dashed var(--accent);color:var(--accent);border-radius:6px;padding:7px 14px;cursor:pointer;font-size:14px;font-weight:600}
@@ -92,6 +92,15 @@
         .then(function(r){ grid=unwrap(r); render(); })
         .catch(function(e){ document.getElementById("balance").innerText="Fejl ved indl\u00e6sning: "+JSON.stringify(e); });
     }
+    // vis kun arbejdspakke-navnet (projektnavn staar som sektionsoverskrift)
+    function cleanName(r){
+      var n=r.name||r.key;
+      if(r.project_name){
+        var pfx=r.project_name+": ";
+        if(n.indexOf(pfx)===0){ n=n.substring(pfx.length); }
+      }
+      return n;
+    }
     function sectionRow(title){
       var tr=document.createElement("tr"); tr.className="section";
       var td=document.createElement("td"); td.colSpan=8; td.innerText=title;
@@ -115,6 +124,15 @@
         inp.oninput=recalc; td.appendChild(inp); tr.appendChild(td);
       }
       return tr;
+    }
+    // skru skriftstoerrelsen ned indtil hele navnet passer i foerste kolonne
+    function fitText(){
+      var spans=document.querySelectorAll("#services tbody span.svcname, #absence tbody span.svcname");
+      spans.forEach(function(sp){
+        var size=14; sp.style.fontSize=size+"px";
+        var guard=0;
+        while(sp.scrollWidth>sp.clientWidth && size>9 && guard<40){ size-=0.5; sp.style.fontSize=size+"px"; guard++; }
+      });
     }
     function render(){
       document.getElementById("weeklabel").innerText="Uge fra "+iso(monday);
@@ -145,7 +163,7 @@
       // Sektion 1: interne
       st.appendChild(sectionRow("Interne timer & kategorier"));
       if(fillRow){ st.appendChild(makeRow(fillRow.key,fillRow.name,"auto",fillRow.days,{removable:false})); }
-      internals.forEach(function(r){ st.appendChild(makeRow(r.key,r.name,"auto",r.days,{removable:!r.extra})); });
+      internals.forEach(function(r){ st.appendChild(makeRow(r.key,cleanName(r),"auto",r.days,{removable:!r.extra})); });
       // Sektioner: projekter (sorteret paa projektnavn)
       projOrder.sort(function(a,b){
         var na=(projGroups[a][0]&&projGroups[a][0].project_name)?projGroups[a][0].project_name:a;
@@ -157,7 +175,7 @@
         var pname=(g[0]&&g[0].project_name)?g[0].project_name:pid;
         st.appendChild(sectionRow(pname));
         g.sort(function(a,b){ return (""+(a.name||"")).localeCompare(""+(b.name||"")); });
-        g.forEach(function(r){ st.appendChild(makeRow(r.key,r.name,"auto",r.days,{removable:!r.extra})); });
+        g.forEach(function(r){ st.appendChild(makeRow(r.key,cleanName(r),"auto",r.days,{removable:!r.extra})); });
       });
       // --- forudfyldning af default-fill raekken ---
       if(grid.fillKey){
@@ -167,6 +185,7 @@
           if(s>0 && !cell.value){ cell.value=s; } } }
       }
       recalc();
+      fitText();
     }
     function applyAbsenceZeroing(){
       if(!grid||!grid.fillKey) return;
