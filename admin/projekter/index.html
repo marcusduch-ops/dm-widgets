@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <base target="_top">
+  <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+  <style>
+    :root{--accent:#E6335A;--accent-dark:#C71F45;--navy:#1f2d5a;--bg:#f4f6f8;--line:#e3e6ea;--ink:#2a2f45}
+    body{font-family:Arial,Helvetica,sans-serif;margin:0;background:var(--bg);color:var(--ink)}
+    .wrap{padding:18px;max-width:960px;margin:0 auto}
+    h2{margin:0 0 4px;color:var(--navy);font-size:20px}
+    .sub{color:#6b7280;font-size:13px;margin:0 0 16px}
+    .panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .panel h3{margin:0 0 12px;color:var(--navy);font-size:15px}
+    label{display:block;font-size:13px;color:#555;margin:8px 0 3px}
+    input[type=text],input[type=number],select{width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #cfd4da;border-radius:6px;font-size:14px}
+    .row2{display:flex;gap:14px;flex-wrap:wrap}
+    .row2>div{flex:1;min-width:220px}
+    .mode{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+    .mode select{max-width:420px}
+    .btn{padding:8px 16px;border:none;background:var(--accent);color:#fff;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600}
+    .btn:hover{background:var(--accent-dark)}
+    .btn:disabled{background:#c9ccd2;cursor:default}
+    .btn.alt{background:#fff;color:var(--accent);border:1px solid var(--accent)}
+    .btn.alt:hover{background:#fbe9ee}
+    .btn.ghost{background:#fff;color:#555;border:1px solid #cfd4da;font-weight:400}
+    .btn.ghost:hover{background:#f0f2f5}
+    .wp{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:10px;background:#fafbfc}
+    .wp .wphead{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+    .wp .wptag{font-size:12px;color:#8a90a0}
+    .rm{background:none;border:none;color:var(--accent-dark);cursor:pointer;font-size:18px;line-height:1;padding:0 4px}
+    .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0}
+    .chip{display:inline-flex;align-items:center;gap:6px;background:#fbe9ee;color:var(--navy);border:1px solid #f3c6d3;border-radius:14px;padding:3px 6px 3px 10px;font-size:13px}
+    .chip button{background:none;border:none;color:var(--accent-dark);cursor:pointer;font-size:15px;line-height:1;padding:0}
+    .adduser{display:flex;gap:8px;align-items:center;margin-top:8px}
+    .adduser select{max-width:320px}
+    .foot{display:flex;gap:10px;align-items:center;margin-top:6px}
+    .msg{font-size:14px;margin-left:4px}
+    .msg.ok{color:#137333}.msg.err{color:var(--accent-dark)}
+    .info{padding:16px;color:#8a90a0}
+    .empty{color:#8a90a0;font-size:13px;font-style:italic}
+  </style>
+</head>
+<body>
+ <div class="wrap">
+  <h2>Projekter &amp; arbejdspakker (admin)</h2>
+  <p class="sub">Opret nye projekter, tilf&oslash;j arbejdspakker, og tildel medarbejdere &ndash; alt p&aring; &eacute;n side. N&oslash;gler genereres automatisk.</p>
+
+  <div id="gate" class="info">Indl&aelig;ser&hellip;</div>
+
+  <div id="app" style="display:none">
+    <div class="panel">
+      <h3>1. V&aelig;lg projekt</h3>
+      <div class="mode">
+        <select id="projPicker" onchange="onPickProject()">
+          <option value="">&mdash; Nyt projekt &mdash;</option>
+        </select>
+        <button class="btn ghost" onclick="newProject()">+ Nyt projekt</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>2. Projektoplysninger</h3>
+      <div class="row2">
+        <div>
+          <label>Projektnavn</label>
+          <input type="text" id="pname" placeholder="fx Danish Maritime Data Hub">
+        </div>
+        <div>
+          <label>Budget (timer)</label>
+          <input type="number" id="pbudget" step="0.1" min="0" placeholder="fx 1600">
+        </div>
+      </div>
+      <div id="pidTag" class="wptag" style="margin-top:8px"></div>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <h3 style="margin:0">3. Arbejdspakker</h3>
+        <button class="btn alt" onclick="addWp()">+ Tilf&oslash;j arbejdspakke</button>
+      </div>
+      <div id="wps"></div>
+    </div>
+
+    <div class="foot">
+      <button id="saveBtn" class="btn" onclick="save()">Gem projekt</button>
+      <span id="msg" class="msg"></span>
+    </div>
+  </div>
+ </div>
+
+ <script>
+   var WORKSPACE="danskemaritime";
+   var SETUP=null;      // full setup from server
+   var EMPLOYEES=[];    // [{email,name}]
+   var wpSeq=0;         // unique DOM ids for wp rows
+
+   function api(name,method,extra){
+     var cfg={api_name:name,workspace_name:WORKSPACE,http_method:method};
+     if(extra){ for(var k in extra){ cfg[k]=extra[k]; } }
+     return ZOHO.CREATOR.DATA.invokeCustomApi(cfg);
+   }
+   function unwrap(r){ var x=(r&&r.result!==undefined)?r.result:(r&&r.data!==undefined?r.data:r); if(typeof x==="string"){try{x=JSON.parse(x);}catch(e){}} return x; }
+   function esc(s){ return (""+(s==null?"":s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+   function numDa(v){ if(v==null||v==="") return 0; return parseFloat((""+v).replace(",",".").trim())||0; }
+   function showMsg(t,cls){ var m=document.getElementById("msg"); m.innerText=t; m.className="msg "+(cls||""); }
+
+   // ---------- init ----------
+   function load(){
+     api("admin_get_setup","GET",{})
+       .then(function(r){
+         var d=unwrap(r);
+         if(!d || d.status==="DENIED"){
+           document.getElementById("gate").innerText = (d&&d.message) ? d.message : "Adgang n\u00e6gtet.";
+           return;
+         }
+         SETUP=d; EMPLOYEES=d.employees||[];
+         document.getElementById("gate").style.display="none";
+         document.getElementById("app").style.display="block";
+         fillProjectPicker();
+         newProject();
+       })
+       .catch(function(e){ document.getElementById("gate").innerText="Fejl ved indl\u00e6sning: "+JSON.stringify(e); });
+   }
+
+   function fillProjectPicker(){
+     var sel=document.getElementById("projPicker");
+     sel.innerHTML='<option value="">\u2014 Nyt projekt \u2014</option>';
+     (SETUP.projects||[]).forEach(function(p){
+       var o=document.createElement("option");
+       o.value=p.project_id; o.text=p.project_name+" ("+p.project_id+")";
+       sel.add(o);
+     });
+   }
+
+   // ---------- project mode ----------
+   function newProject(){
+     document.getElementById("projPicker").value="";
+     document.getElementById("pname").value="";
+     document.getElementById("pbudget").value="";
+     document.getElementById("pidTag").innerText="Ny n\u00f8gle genereres automatisk ved gem.";
+     document.getElementById("wps").innerHTML="";
+     addWp();
+     showMsg("");
+   }
+
+   function onPickProject(){
+     var pid=document.getElementById("projPicker").value;
+     if(!pid){ newProject(); return; }
+     var p=(SETUP.projects||[]).find(function(x){return x.project_id===pid;});
+     if(!p){ newProject(); return; }
+     document.getElementById("pname").value=p.project_name||"";
+     document.getElementById("pbudget").value=(p.budget!=null? (""+p.budget).replace(".",","):"");
+     document.getElementById("pidTag").innerText="N\u00f8gle: "+p.project_id;
+     document.getElementById("wps").innerHTML="";
+     (p.work_packages||[]).forEach(function(w){ addWp(w); });
+     if(!p.work_packages || p.work_packages.length===0){ addWp(); }
+     showMsg("");
+   }
+
+   // ---------- work package rows ----------
+   function addWp(w){
+     wpSeq++;
+     var id="wp"+wpSeq;
+     var existing = w && w.work_package_id ? w.work_package_id : "";
+     var wrap=document.createElement("div");
+     wrap.className="wp"; wrap.id=id;
+     wrap.dataset.wpid=existing;
+     wrap.dataset.users = JSON.stringify((w&&w.users)?w.users:[]);
+     var tag = existing ? ("N\u00f8gle: "+existing) : "Ny \u2013 n\u00f8gle genereres";
+     wrap.innerHTML =
+       '<div class="wphead"><span class="wptag">'+tag+'</span>'+
+         '<button class="rm" title="Fjern r\u00e6kke" onclick="rmWp(\''+id+'\')">&times;</button></div>'+
+       '<div class="row2">'+
+         '<div><label>Arbejdspakke-navn</label><input type="text" class="wpname" value="'+esc(w&&w.name?w.name:"")+'" placeholder="fx WP-1 Behovsafd\u00e6kning"></div>'+
+         '<div><label>Budget (timer)</label><input type="number" step="0.1" min="0" class="wpbudget" value="'+(w&&w.budget!=null?(""+w.budget).replace(".",","):"")+'" placeholder="fx 250"></div>'+
+       '</div>'+
+       '<label>Tildelte medarbejdere</label>'+
+       '<div class="chips"></div>'+
+       '<div class="adduser">'+
+         '<select class="userpick"><option value="">\u2014 v\u00e6lg medarbejder \u2014</option></select>'+
+         '<button class="btn ghost" onclick="addUser(\''+id+'\')">+ Tilf\u00f8j</button>'+
+       '</div>';
+     document.getElementById("wps").appendChild(wrap);
+     // fill user dropdown
+     var pick=wrap.querySelector(".userpick");
+     EMPLOYEES.forEach(function(e){
+       var o=document.createElement("option"); o.value=e.email; o.text=e.name+" ("+e.email+")"; pick.add(o);
+     });
+     renderChips(id);
+   }
+
+   function rmWp(id){
+     var el=document.getElementById(id);
+     if(el){ el.parentNode.removeChild(el); }
+   }
+
+   function getUsers(id){ try{ return JSON.parse(document.getElementById(id).dataset.users)||[]; }catch(e){ return []; } }
+   function setUsers(id,arr){ document.getElementById(id).dataset.users=JSON.stringify(arr); }
+
+   function addUser(id){
+     var wrap=document.getElementById(id);
+     var pick=wrap.querySelector(".userpick");
+     var em=pick.value;
+     if(!em) return;
+     var arr=getUsers(id);
+     if(arr.indexOf(em)===-1){ arr.push(em); setUsers(id,arr); renderChips(id); }
+     pick.value="";
+   }
+
+   function removeUser(id,em){
+     var arr=getUsers(id).filter(function(x){return x!==em;});
+     setUsers(id,arr); renderChips(id);
+   }
+
+   function nameFor(em){
+     var e=EMPLOYEES.find(function(x){return x.email===em;});
+     return e? e.name : em;
+   }
+
+   function renderChips(id){
+     var wrap=document.getElementById(id);
+     var box=wrap.querySelector(".chips");
+     var arr=getUsers(id);
+     if(arr.length===0){ box.innerHTML='<span class="empty">Ingen tildelt endnu.</span>'; return; }
+     box.innerHTML="";
+     arr.forEach(function(em){
+       var c=document.createElement("span"); c.className="chip";
+       c.innerHTML=esc(nameFor(em))+' <button title="Fjern" onclick="removeUser(\''+id+'\',\''+em.replace(/'/g,"\\'")+'\')">&times;</button>';
+       box.appendChild(c);
+     });
+   }
+
+   // ---------- save ----------
+   function save(){
+     var pname=document.getElementById("pname").value.trim();
+     if(!pname){ showMsg("Projektnavn er p\u00e5kr\u00e6vet.","err"); return; }
+     var payload={
+       project_id: document.getElementById("projPicker").value || "",
+       project_name: pname,
+       budget: numDa(document.getElementById("pbudget").value),
+       work_packages: []
+     };
+     var rows=document.querySelectorAll("#wps .wp");
+     rows.forEach(function(el){
+       var wpname=el.querySelector(".wpname").value.trim();
+       if(wpname){
+         payload.work_packages.push({
+           work_package_id: el.dataset.wpid || "",
+           name: wpname,
+           budget: numDa(el.querySelector(".wpbudget").value),
+           users: getUsers(el.id)
+         });
+       }
+     });
+     var btn=document.getElementById("saveBtn");
+     btn.disabled=true; showMsg("Gemmer\u2026","");
+     api("admin_save_project","POST",{payload:{projectJson:JSON.stringify(payload)}})
+       .then(function(r){
+         var res=unwrap(r);
+         var txt=(typeof res==="string")?res:JSON.stringify(res);
+         if(txt.indexOf("DENIED")===0 || txt.indexOf("FEJL")===0){ showMsg(txt,"err"); btn.disabled=false; return; }
+         showMsg(txt,"ok");
+         // reload setup so keys + assignments refresh, then reselect this project
+         api("admin_get_setup","GET",{}).then(function(r2){
+           var d=unwrap(r2);
+           if(d && d.status!=="DENIED"){ SETUP=d; EMPLOYEES=d.employees||[]; fillProjectPicker();
+             // try to reselect by name
+             var match=(SETUP.projects||[]).find(function(x){return x.project_name===payload.project_name;});
+             if(match){ document.getElementById("projPicker").value=match.project_id; onPickProject(); showMsg(txt,"ok"); }
+           }
+           btn.disabled=false;
+         }).catch(function(){ btn.disabled=false; });
+       })
+       .catch(function(e){ showMsg("Fejl ved gem: "+JSON.stringify(e),"err"); btn.disabled=false; });
+   }
+
+   load();
+ </script>
+</body>
+</html>
