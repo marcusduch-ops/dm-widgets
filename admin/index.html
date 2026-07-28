@@ -32,36 +32,22 @@
     .tag56{background:#fde7ee;color:var(--accent-dark)}
     .taglong{background:#fff4e5;color:#b06000}
     .lockbar{display:flex;gap:10px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:16px}
-    /* --- new: cards --- */
     .summary{display:flex;gap:14px;margin:0 0 4px;flex-wrap:wrap}
     .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 18px;min-width:150px;box-shadow:0 1px 2px rgba(0,0,0,.04);flex:1}
     .card .lbl{font-size:12px;color:#6b7280;margin-bottom:4px}
     .card .val{font-size:22px;font-weight:700;color:var(--navy)}
     .card .val.ok{color:#137333}.card .val.warn{color:#d97706}.card .val.over{color:var(--accent-dark)}
     .card .sub{font-size:11px;color:#8a90a0;margin-top:3px}
-    /* --- new: heatmap --- */
-    .cal{display:flex;flex-wrap:wrap;gap:10px}
-    .month{border:1px solid var(--line);border-radius:8px;padding:10px}
-    .month h4{margin:0 0 8px;color:var(--navy);font-size:13px;text-align:center}
-    .cgrid{display:grid;grid-template-columns:repeat(7,24px);gap:3px}
-    .dow{font-size:10px;color:#8a90a0;text-align:center}
-    .cell{width:24px;height:24px;border-radius:4px;background:#eef1f6;font-size:10px;display:flex;align-items:center;justify-content:center;color:#33384d}
-    .cell.zero{background:#eef1f6;color:#c2c7d0}
-    .cell.ok{background:#c8e6c9}.cell.under{background:#ffe0b2}.cell.over{background:#f6b8c6}
-    .cell.absence{background:#d9c2f0;color:#4a2f6b}.cell.weekend{background:#f7f8fa;color:#c2c7d0}
-    .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:#555}
-    .legend span{display:inline-flex;align-items:center;gap:5px}
-    .sw{width:14px;height:14px;border-radius:3px;display:inline-block}
     .bar{height:9px;border-radius:5px;background:#eceef1;overflow:hidden;width:120px;display:inline-block;vertical-align:middle}
     .bar>span{display:block;height:100%}
-    /* --- new: weekly bars --- */
-    .weeks{display:flex;align-items:flex-end;gap:6px;height:150px;padding:10px 4px 0;overflow-x:auto;position:relative}
+    .weeks{display:flex;align-items:flex-end;gap:6px;height:150px;padding:10px 4px 0;overflow-x:auto}
     .wbar{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:34px}
     .wbar .col{width:22px;border-radius:4px 4px 0 0;background:var(--navy)}
     .wbar .col.over48{background:var(--accent)}
     .wbar .lab{font-size:9px;color:#8a90a0;margin-top:3px;white-space:nowrap}
     .wbar .v{font-size:9px;color:#33384d}
     .ref48{font-size:12px;color:var(--accent-dark);margin-top:6px}
+    .notebox{background:#eef1f6;border-radius:8px;padding:8px 12px;font-size:12px;color:#555;margin-bottom:10px}
   </style>
 </head>
 <body>
@@ -84,23 +70,11 @@
     <button id="csvBtn" class="btn" onclick="downloadCsv()" disabled>&#8681; CSV frav&aelig;r</button>
   </div>
 
-  <!-- ============ NEW: per-employee detail ============ -->
+  <!-- ============ per-employee detail ============ -->
   <div id="detail" style="display:none">
+    <div id="detailNote"></div>
     <div id="cards" class="summary"></div>
     <div style="text-align:right;margin:6px 0 0"><button class="btn alt" onclick="downloadDetailCsv()">&#8681; Excel/CSV for perioden</button></div>
-
-    <h3>Kalenderoverblik</h3>
-    <div class="panel pad">
-      <div id="cal" class="cal"></div>
-      <div class="legend">
-        <span><i class="sw" style="background:#c8e6c9"></i> Normal dag</span>
-        <span><i class="sw" style="background:#ffe0b2"></i> Under norm</span>
-        <span><i class="sw" style="background:#f6b8c6"></i> Over norm</span>
-        <span><i class="sw" style="background:#d9c2f0"></i> Frav&aelig;r</span>
-        <span><i class="sw" style="background:#eef1f6"></i> Ingen registrering</span>
-        <span><i class="sw" style="background:#f7f8fa"></i> Weekend</span>
-      </div>
-    </div>
 
     <h3>Fordeling p&aring; kategorier</h3>
     <div class="panel"><table id="dist">
@@ -112,12 +86,12 @@
     <div class="panel pad">
       <div id="wt48"></div>
       <div class="weeks" id="weeks"></div>
-      <div class="ref48">&mdash; R&oslash;d s&oslash;jle = uge over 48 t. Den r&oslash;de linje er 48-timers gr&aelig;nsen.</div>
-      <p class="muted" style="font-size:12px">48-timers reglen: arbejdstiden m&aring; i gennemsnit h&oslash;jst v&aelig;re 48 t/uge over en 4-m&aring;neders periode (jf. arbejdstidsloven). Frav&aelig;r (ferie/sygdom) t&aelig;ller ikke som arbejdstid.</p>
+      <div class="ref48">&mdash; R&oslash;d s&oslash;jle = uge over 48 t.</div>
+      <p class="muted" style="font-size:12px">48-timers reglen: arbejdstiden m&aring; i gennemsnit h&oslash;jst v&aelig;re 48 t/uge over en 4-m&aring;neders periode (jf. arbejdstidsloven). Frav&aelig;r t&aelig;ller ikke som arbejdstid.</p>
     </div>
   </div>
 
-  <!-- ============ EXISTING sections ============ -->
+  <!-- ============ existing sections ============ -->
   <h3>Frav&aelig;rsoverblik</h3>
   <div id="absOut" class="info">V&aelig;lger du &bdquo;Alle&ldquo; ser du hele organisationen; v&aelig;lg en person for detaljer. Dage er beregnet ud fra hver medarbejders dagsnorm.</div>
 
@@ -148,6 +122,7 @@
     function isWeekend(d){ var w=d.getDay(); return w===0||w===6; }
     function daysArr(a,b){ var out=[]; var d=new Date(a); while(d<=b){ out.push(new Date(d)); d.setDate(d.getDate()+1);} return out; }
     function mondayOf(d){ var x=new Date(d); var off=(x.getDay()+6)%7; x.setDate(x.getDate()-off); return x; }
+    function curYear(){ return new Date().getFullYear(); }
 
     function setRange(kind){
       var now=new Date(), f=null, t=null, y=now.getFullYear();
@@ -157,16 +132,21 @@
         if(now.getMonth()>=8){ f=new Date(y,8,1); t=new Date(y+1,7,31); }
         else { f=new Date(y-1,8,1); t=new Date(y,7,31); }
       }
+      // "all": leave both empty
       document.getElementById("from").value=f?iso(f):"";
       document.getElementById("to").value=t?iso(t):"";
       loadAll();
     }
 
     function init(){
+      // default = indevaerende kalenderaar
+      var y=curYear();
+      document.getElementById("from").value=iso(new Date(y,0,1));
+      document.getElementById("to").value=iso(new Date(y,11,31));
       api("get_absence_report","POST",{payload:{empEmail:"",fromStr:"",toStr:""}})
         .then(function(r){ var d=unwrap(r); var sel=document.getElementById("emp");
           (d.employees||[]).forEach(function(e){ var o=document.createElement("option"); o.value=e.email; o.text=e.name; sel.add(o); });
-          absData=d; renderAbsence();
+          loadAll();
         }).catch(function(e){ document.getElementById("absOut").innerText="Fejl: "+JSON.stringify(e); });
       loadRadar();
       var n=new Date(); document.getElementById("lockMonth").value=n.getFullYear()+"-"+("0"+(n.getMonth()+1)).slice(-2);
@@ -247,28 +227,35 @@
         .catch(function(e){ document.getElementById("lockMsg").innerText="Fejl: "+JSON.stringify(e); });
     }
 
-    // ---------- NEW: employee detail ----------
+    // ---------- employee detail ----------
     function loadDetail(){
       var em=document.getElementById("emp").value;
       var box=document.getElementById("detail");
       if(!em){ box.style.display="none"; detail=null; return; }
       var from=document.getElementById("from").value||"";
       var to=document.getElementById("to").value||"";
-      if(!from||!to){ box.style.display="none"; return; }
+      var noteEl=document.getElementById("detailNote");
+      // "Al tid" valgt (tomme datoer): vis detaljer for indevaerende aar med en note
+      if(!from||!to){
+        var y=curYear();
+        from=iso(new Date(y,0,1)); to=iso(new Date(y,11,31));
+        noteEl.innerHTML='<div class="notebox">Detaljerne (fordeling og 48-timers) vises for <strong>'+y+'</strong>. V\u00e6lg et \u00e5rsinterval ovenfor for et andet \u00e5r. Frav\u00e6rsoverblikket nedenfor viser al tid.</div>';
+      } else {
+        noteEl.innerHTML="";
+      }
       api("get_employee_detail","POST",{payload:{empEmail:em,fromStr:from,toStr:to}})
         .then(function(r){ detail=unwrap(r);
           if(!detail||detail.status!=="OK"){ box.style.display="none"; return; }
+          detail._from=from; detail._to=to;
           box.style.display="block"; renderDetail();
         })
         .catch(function(e){ box.style.display="none"; });
     }
     function renderDetail(){
       NORM = detail.norm||7.4;
-      var from=parse(document.getElementById("from").value);
-      var to=parse(document.getElementById("to").value);
+      var from=parse(detail._from), to=parse(detail._to);
       var days=daysArr(from,to);
       var dayH=detail.dayHours||{}, dayA=detail.dayAbsence||{};
-      // cards
       var workdays=0; days.forEach(function(d){ if(!isWeekend(d)) workdays++; });
       var normPeriod=workdays*NORM;
       var totalWork=detail.totalWork||0;
@@ -283,39 +270,10 @@
         card("Difference (t)",(diff>0?"+":"")+fmt(diff),diffCls,"reg. minus norm")+
         card("Gns. uge (4 mdr.)",fmt(avg48),a48cls,"48-timers reglen")+
         card("Frav\u00e6rsdage",absCount,"","i perioden");
-      renderCal(days,dayH,dayA);
       renderDist();
       renderWeeks(days,dayH);
     }
     function card(lbl,val,cls,sub){ return '<div class="card"><div class="lbl">'+lbl+'</div><div class="val '+cls+'">'+val+'</div>'+(sub?'<div class="sub">'+sub+'</div>':'')+'</div>'; }
-
-    function renderCal(days,dayH,dayA){
-      var absName={ferie:"Ferie",sygdom:"Sygdom",barn_syg:"Barns sygdom",barsel:"Barsel",feriefridag:"Feriefridag",andet:"Andet"};
-      var mnames=["jan","feb","mar","apr","maj","jun","jul","aug","sep","okt","nov","dec"];
-      var byMonth={}, order=[];
-      days.forEach(function(d){ var m=d.getFullYear()+"-"+d.getMonth(); if(!byMonth[m]){byMonth[m]=[];order.push(m);} byMonth[m].push(d); });
-      var html="";
-      order.forEach(function(m){
-        var arr=byMonth[m], first=arr[0];
-        html+='<div class="month"><h4>'+mnames[first.getMonth()]+" "+first.getFullYear()+'</h4><div class="cgrid">';
-        ["M","T","O","T","F","L","S"].forEach(function(x){ html+='<div class="dow">'+x+'</div>'; });
-        var lead=(first.getDay()+6)%7;
-        for(var i=0;i<lead;i++){ html+='<div></div>'; }
-        arr.forEach(function(d){
-          var key=iso(d), cls="cell", tip;
-          var h=dayH[key]||0, ab=dayA[key];
-          if(isWeekend(d)){ cls+=" weekend"; tip="Weekend"; }
-          else if(ab){ cls+=" absence"; tip=absName[ab]||ab; }
-          else if(h===0){ cls+=" zero"; tip="Ingen registrering"; }
-          else if(Math.abs(h-NORM)<=0.05){ cls+=" ok"; tip=fmt(h)+" t"; }
-          else if(h<NORM){ cls+=" under"; tip=fmt(h)+" t"; }
-          else { cls+=" over"; tip=fmt(h)+" t"; }
-          html+='<div class="'+cls+'" title="'+key+" \u2013 "+tip+'">'+d.getDate()+'</div>';
-        });
-        html+='</div></div>';
-      });
-      document.getElementById("cal").innerHTML=html;
-    }
 
     function renderDist(){
       var body=document.querySelector("#dist tbody"); body.innerHTML="";
@@ -334,7 +292,6 @@
     }
 
     function renderWeeks(days,dayH){
-      // group worked hours by Monday-week within the period
       var buckets={}, order=[];
       days.forEach(function(d){
         var mk=iso(mondayOf(d));
@@ -348,8 +305,7 @@
         var v=buckets[k];
         var hpx=Math.round(v/maxV*120);
         var over=v>48?" over48":"";
-        var lab=k.slice(5); // MM-DD
-        html+='<div class="wbar"><div class="v">'+(v>0?fmt(v):"")+'</div><div class="col'+over+'" style="height:'+hpx+'px"></div><div class="lab">'+lab+'</div></div>';
+        html+='<div class="wbar"><div class="v">'+(v>0?fmt(v):"")+'</div><div class="col'+over+'" style="height:'+hpx+'px"></div><div class="lab">'+k.slice(5)+'</div></div>';
       });
       var avg48=detail.avgWeekly4mo||0;
       var a48cls=avg48>48?"over":(avg48>44?"warn":"ok");
@@ -359,7 +315,7 @@
       document.getElementById("weeks").innerHTML=html || '<span class="muted">Ingen uger i perioden.</span>';
     }
 
-    // ---------- CSV: absence (existing) ----------
+    // ---------- CSV: absence ----------
     function csvCell(v){ var s=(v===null||v===undefined)?"":(""+v); if(s.indexOf('"')>-1||s.indexOf(';')>-1||s.indexOf('\n')>-1){s='"'+s.replace(/"/g,'""')+'"';} return s; }
     function csvNum(n){ return (""+(Math.round(n*100)/100)).replace(".",","); }
     function downloadCsv(){
@@ -387,11 +343,10 @@
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
 
-    // ---------- CSV: employee detail (new) ----------
+    // ---------- CSV: employee detail ----------
     function downloadDetailCsv(){
       if(!detail||detail.status!=="OK") return;
-      var from=document.getElementById("from").value||"al tid";
-      var to=document.getElementById("to").value||"al tid";
+      var from=detail._from, to=detail._to;
       var absName={ferie:"Ferie",sygdom:"Sygdom",barn_syg:"Barns sygdom",barsel:"Barsel",feriefridag:"Feriefridag",andet:"Andet"};
       var sep=";", lines=[];
       lines.push(["Medarbejderoverblik",detail.empName||""].map(csvCell).join(sep));
@@ -405,7 +360,7 @@
       lines.push([]);
       lines.push(["DAGLIG OVERSIGT"].map(csvCell).join(sep));
       lines.push(["Dato","Timer","Fravaer"].map(csvCell).join(sep));
-      var days=daysArr(parse(document.getElementById("from").value),parse(document.getElementById("to").value));
+      var days=daysArr(parse(from),parse(to));
       var dayH=detail.dayHours||{}, dayA=detail.dayAbsence||{};
       days.forEach(function(d){ var key=iso(d);
         lines.push([key,csvNum(dayH[key]||0),dayA[key]?(absName[dayA[key]]||dayA[key]):""].map(csvCell).join(sep)); });
