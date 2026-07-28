@@ -427,13 +427,14 @@
         inp.type="number"; inp.step="0.1"; inp.min="0"; inp.max="24";
         if(days&&days[i]){ inp.value=obToInput(days[i].hours||0); if(days[i].locked){ inp.disabled=true; td.className="locked"; } }
         if(opts.role==="fill"){ inp.readOnly=true; inp.className="ro"; inp.tabIndex=-1; }
-        else if(opts.role==="total"){ inp.oninput=obOnTotalInput; }
+        else if(opts.role==="total"){ inp.oninput=obOnTotalInput; inp.onblur=obOnTotalBlur; }
         else { inp.oninput=obRecalc; }
         td.appendChild(inp); tr.appendChild(td);
       }
       return tr;
     }
-    function obOnTotalInput(e){ var inp=e.target; inp.dataset.manual=(inp.value.trim()==="")?"0":"1"; obRecalc(); }
+    function obOnTotalInput(e){ e.target.dataset.manual="1"; obRecalc(); }
+    function obOnTotalBlur(e){ var inp=e.target; if(inp.value.trim()===""){ inp.dataset.manual="0"; } obRecalc(); }
     function obFitText(){
       var spans=document.querySelectorAll("#observices tbody span.svcname, #obabsence tbody span.svcname");
       spans.forEach(function(sp){ var size=14; sp.style.fontSize=size+"px"; var guard=0;
@@ -509,11 +510,16 @@
         var ti=tr.children[i+1].querySelector("input");
         var manual=ti.dataset.manual==="1";
         var T;
-        if(manual){ T=obVal(ti); if(T<S){ T=S; ti.value=obToInput(T); } }
-        else { T=Math.max(S, Math.max(0, dayNorm-absSum)); ti.value=obToInput(T); }
-        var O=Math.max(0, Math.round((T-S)*100)/100);
+        if(manual){
+          T=obVal(ti);
+          if(T<S && document.activeElement!==ti){ T=S; ti.value=obToInput(T); }
+        } else {
+          T=Math.max(S, Math.max(0, dayNorm-absSum)); ti.value=obToInput(T);
+        }
+        var work=Math.max(T,S);
+        var O=Math.max(0, Math.round((work-S)*100)/100);
         if(fr){ fr.children[i+1].querySelector("input").value=obToInput(O); }
-        var accounted=T+absSum;
+        var accounted=work+absSum;
         var cls=Math.abs(accounted-dayNorm)<=obTOL?"ok":(accounted<dayNorm?"under":"over");
         var mark=Math.abs(accounted-dayNorm)<=obTOL?("\u2713 "+fmt(accounted)):(fmt(accounted)+" ("+(accounted-dayNorm>0?"+":"")+fmt(accounted-dayNorm)+")");
         h+="<td class='"+cls+"'>"+mark+"</td>";
