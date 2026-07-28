@@ -48,7 +48,7 @@
     .wbar .v{font-size:9px;color:#33384d}
     .ref48{font-size:12px;color:var(--accent-dark);margin-top:6px}
     .notebox{background:#eef1f6;border-radius:8px;padding:8px 12px;font-size:12px;color:#555;margin-bottom:10px}
-    /* ===== Udfyld ugeskema paa vegne af (grid) – NYT step 3 ===== */
+    /* ===== Udfyld ugeskema paa vegne af (grid) ===== */
     #obSection{--firstcol:260px}
     #obhead{display:flex;gap:8px;align-items:center;margin-bottom:12px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;flex-wrap:wrap}
     #obhead button{padding:6px 12px;border:1px solid #cfd4da;background:#fff;border-radius:6px;cursor:pointer;font-size:14px}
@@ -63,8 +63,12 @@
     #obwrap .gtbl th:first-child,#obwrap .gtbl td:first-child{text-align:left;width:var(--firstcol);white-space:normal}
     #obwrap .gtbl td input{width:100%;box-sizing:border-box;text-align:right;border:1px solid #d5d9df;border-radius:4px;padding:3px 4px}
     #obwrap .gtbl td input:focus{outline:2px solid var(--accent);border-color:var(--accent)}
+    #obwrap .gtbl td input.ro{background:#eef1f6;color:#5a6072;border-style:dashed;cursor:not-allowed}
     #obwrap .gtbl .locked{background:#f1f1f1;color:#888}
     #obwrap .gtbl tr.section td{background:#eef1f6;color:var(--navy);font-weight:700;text-align:left;font-size:13px;border-right:none}
+    #obwrap .gtbl tr.totalrow td{background:#fff4f7}
+    #obwrap .gtbl tr.totalrow td:first-child{color:var(--navy);font-weight:700}
+    #obwrap .gtbl tr.fillrow td:first-child{color:#5a6072;font-style:italic}
     #obwrap .gtbl td:first-child span.svcname{display:inline-block;max-width:calc(var(--firstcol) - 12px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;line-height:1.2}
     #obwrap .ok{color:#137333;font-weight:600}#obwrap .under{color:#d97706;font-weight:600}#obwrap .over{color:var(--accent-dark);font-weight:700}
   </style>
@@ -105,10 +109,10 @@
       <p class="muted" style="font-size:12px">48-timers reglen: arbejdstiden m&aring; i gennemsnit h&oslash;jst v&aelig;re 48 t/uge over en 4-m&aring;neders periode (jf. arbejdstidsloven). Frav&aelig;r t&aelig;ller ikke som arbejdstid.</p>
     </div>
   </div>
-  <!-- ============ NYT: udfyld ugeskema paa vegne af (kun admin) ============ -->
+  <!-- ============ udfyld ugeskema paa vegne af (kun admin) ============ -->
   <div id="obSection" style="display:none">
     <h3 id="obTitle">Udfyld ugeskema p&aring; vegne af</h3>
-    <div class="notebox">Du redigerer en kollegas ugeskema som administrator &ndash; &aelig;ndringer gemmes direkte p&aring; deres skema. Nye ydelser tildeles via modulet &bdquo;Projekter &amp; arbejdspakker&ldquo;; her udfylder du timer p&aring; de ydelser, personen allerede har.</div>
+    <div class="notebox">Du redigerer en kollegas ugeskema som administrator &ndash; &aelig;ndringer gemmes direkte p&aring; deres skema. &bdquo;Arbejdstid i alt&ldquo; er den samlede arbejdstid pr. dag; resten havner automatisk i &bdquo;Ufordelt (opsamling)&ldquo;, som ikke kan redigeres. Nye ydelser tildeles via modulet &bdquo;Projekter &amp; arbejdspakker&ldquo;.</div>
     <div id="obwrap">
       <div id="obhead">
         <button onclick="obShiftWeek(-1)">&larr; Forrige</button>
@@ -121,7 +125,7 @@
       <div class="panel"><table class="gtbl" id="obabsence">
         <colgroup><col><col><col><col><col><col><col><col></colgroup>
         <thead><tr><th>Type</th><th>Man</th><th>Tir</th><th>Ons</th><th>Tor</th><th>Fre</th><th>L&oslash;r</th><th>S&oslash;n</th></tr></thead><tbody></tbody></table></div>
-      <h3>Ydelser</h3>
+      <h3>Arbejdstid &amp; ydelser</h3>
       <div class="panel"><table class="gtbl" id="observices">
         <colgroup><col><col><col><col><col><col><col><col></colgroup>
         <thead><tr><th>Ydelse</th><th>Man</th><th>Tir</th><th>Ons</th><th>Tor</th><th>Fre</th><th>L&oslash;r</th><th>S&oslash;n</th></tr></thead><tbody></tbody></table></div>
@@ -165,13 +169,11 @@
         if(now.getMonth()>=8){ f=new Date(y,8,1); t=new Date(y+1,7,31); }
         else { f=new Date(y-1,8,1); t=new Date(y,7,31); }
       }
-      // "all": leave both empty
       document.getElementById("from").value=f?iso(f):"";
       document.getElementById("to").value=t?iso(t):"";
       loadAll();
     }
     function init(){
-      // default = indevaerende kalenderaar
       var y=curYear();
       document.getElementById("from").value=iso(new Date(y,0,1));
       document.getElementById("to").value=iso(new Date(y,11,31));
@@ -262,7 +264,6 @@
       var from=document.getElementById("from").value||"";
       var to=document.getElementById("to").value||"";
       var noteEl=document.getElementById("detailNote");
-      // "Al tid" valgt (tomme datoer): vis detaljer for indevaerende aar med en note
       if(!from||!to){
         var y=curYear();
         from=iso(new Date(y,0,1)); to=iso(new Date(y,11,31));
@@ -393,12 +394,12 @@
       a.download=(detail.empName||"medarbejder").replace(/ /g,"_")+"_"+from+"_"+to+".csv";
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
-    // ============ NYT (step 3): udfyld ugeskema paa vegne af ============
-    // Genbruger grid-logikken fra Grid.html, men sender den VALGTE medarbejders
-    // e-mail (ikke "self"), saa admin-override i getWeekGrid/saveWeek aktiveres.
+    // ============ udfyld ugeskema paa vegne af (accumulator-model) ============
     var obMonday=null, obGrid=null, obNORM=7.4, obTOL=0.05;
     function obInitMonday(){ var d=new Date(); var dow=(d.getDay()+6)%7; d.setDate(d.getDate()-dow); obMonday=d; }
     function obSelName(){ var s=document.getElementById("emp"); return (s.options[s.selectedIndex]?s.options[s.selectedIndex].text:""); }
+    function obVal(inp){ return parseFloat(inp.value)||0; }
+    function obToInput(n){ return n>0 ? String(Math.round(n*100)/100) : ""; }
     function obLoadWeek(){
       var em=document.getElementById("emp").value;
       var sec=document.getElementById("obSection");
@@ -413,44 +414,68 @@
     }
     function obCleanName(r){ var n=r.name||r.key; if(r.project_name){ var pfx=r.project_name+": "; if(n.indexOf(pfx)===0){ n=n.substring(pfx.length); } } return n; }
     function obSectionRow(title){ var tr=document.createElement("tr"); tr.className="section"; var td=document.createElement("td"); td.colSpan=8; td.innerText=title; tr.appendChild(td); return tr; }
-    function obMakeRow(key,name,kind,days){
-      var tr=document.createElement("tr"); tr.className="drow"; tr.dataset.key=key; tr.dataset.kind=kind; tr.dataset.name=name;
+    function obMakeRow(key,name,kind,days,opts){
+      opts=opts||{};
+      var tr=document.createElement("tr"); tr.className="drow"; tr.dataset.key=key; tr.dataset.kind=kind; tr.dataset.name=name; tr.dataset.role=opts.role||"";
+      if(opts.role==="total"){ tr.classList.add("totalrow"); }
+      if(opts.role==="fill"){ tr.classList.add("fillrow"); }
       var td0=document.createElement("td");
-      var sp=document.createElement("span"); sp.className="svcname"; sp.innerText=name; sp.title=name; td0.appendChild(sp);
+      var sp=document.createElement("span"); sp.className="svcname"; var disp=opts.display||name; sp.innerText=disp; sp.title=disp; td0.appendChild(sp);
       tr.appendChild(td0);
       for(var i=0;i<7;i++){
         var td=document.createElement("td"), inp=document.createElement("input");
         inp.type="number"; inp.step="0.1"; inp.min="0"; inp.max="24";
-        if(days&&days[i]){ inp.value=days[i].hours||""; if(days[i].locked){ inp.disabled=true; td.className="locked"; } }
-        inp.oninput=obRecalc; td.appendChild(inp); tr.appendChild(td);
+        if(days&&days[i]){ inp.value=obToInput(days[i].hours||0); if(days[i].locked){ inp.disabled=true; td.className="locked"; } }
+        if(opts.role==="fill"){ inp.readOnly=true; inp.className="ro"; inp.tabIndex=-1; }
+        else if(opts.role==="total"){ inp.oninput=obOnTotalInput; }
+        else { inp.oninput=obRecalc; }
+        td.appendChild(inp); tr.appendChild(td);
       }
       return tr;
     }
+    function obOnTotalInput(e){ var inp=e.target; inp.dataset.manual=(inp.value.trim()==="")?"0":"1"; obRecalc(); }
     function obFitText(){
       var spans=document.querySelectorAll("#observices tbody span.svcname, #obabsence tbody span.svcname");
       spans.forEach(function(sp){ var size=14; sp.style.fontSize=size+"px"; var guard=0;
         while(sp.scrollWidth>sp.clientWidth && size>9 && guard<40){ size-=0.5; sp.style.fontSize=size+"px"; guard++; } });
     }
+    function obTotalRow(){ return document.querySelector('#observices tbody tr[data-role="total"]'); }
+    function obFillRow(){ return document.querySelector('#observices tbody tr[data-role="fill"]'); }
+    function obSumServices(i){
+      var s=0;
+      document.querySelectorAll("#observices tbody tr.drow").forEach(function(tr){
+        var role=tr.dataset.role; if(role==="total"||role==="fill") return;
+        s+=obVal(tr.children[i+1].querySelector("input"));
+      });
+      return s;
+    }
+    function obFillVal(i){ var f=obFillRow(); return f?obVal(f.children[i+1].querySelector("input")):0; }
+    function obSumAbsence(i){
+      var s=0;
+      document.querySelectorAll("#obabsence tbody tr.drow").forEach(function(tr){ s+=obVal(tr.children[i+1].querySelector("input")); });
+      return s;
+    }
     function obRender(){
       document.getElementById("obTitle").innerText="Udfyld ugeskema p\u00e5 vegne af \u2013 "+obSelName();
       document.getElementById("obweeklabel").innerText="Uge fra "+iso(obMonday);
       if(obGrid.norm){ obNORM=obGrid.norm; }
-      // --- Fravaer ---
+      // Fravaer
       var at=document.querySelector("#obabsence tbody"); at.innerHTML="";
-      (obGrid.absence||[]).forEach(function(a){ at.appendChild(obMakeRow(a.key,a.name,"absence",a.days)); });
-      // --- Ydelser: grupperet ---
+      (obGrid.absence||[]).forEach(function(a){ at.appendChild(obMakeRow(a.key,a.name,"absence",a.days,{})); });
+      // Ydelser
       var st=document.querySelector("#observices tbody"); st.innerHTML="";
       var all=(obGrid.rows||[]).slice();
-      var fillRow=null, internals=[], projGroups={}, projOrder=[];
+      var fill=null, internals=[], projGroups={}, projOrder=[];
       all.forEach(function(r){
-        if(r.isFill){ fillRow=r; return; }
+        if(r.isFill){ fill=r; return; }
         if(r.kind==="project"){ var pid=r.project_id||"(uden projekt)"; if(!projGroups[pid]){ projGroups[pid]=[]; projOrder.push(pid); } projGroups[pid].push(r); }
         else { internals.push(r); }
       });
       internals.sort(function(a,b){ return (a.sort_order||999)-(b.sort_order||999); });
+      st.appendChild(obMakeRow("__total__","Arbejdstid i alt","total",null,{role:"total",display:"Arbejdstid i alt"}));
       st.appendChild(obSectionRow("Interne timer & kategorier"));
-      if(fillRow){ st.appendChild(obMakeRow(fillRow.key,fillRow.name,"auto",fillRow.days)); }
-      internals.forEach(function(r){ st.appendChild(obMakeRow(r.key,obCleanName(r),"auto",r.days)); });
+      if(fill){ st.appendChild(obMakeRow(fill.key,fill.name,"auto",fill.days,{role:"fill",display:(fill.name+" \u00b7 opsamling (beregnes)")})); }
+      internals.forEach(function(r){ st.appendChild(obMakeRow(r.key,obCleanName(r),"auto",r.days,{})); });
       projOrder.sort(function(a,b){
         var na=(projGroups[a][0]&&projGroups[a][0].project_name)?projGroups[a][0].project_name:a;
         var nb=(projGroups[b][0]&&projGroups[b][0].project_name)?projGroups[b][0].project_name:b;
@@ -460,39 +485,37 @@
         var g=projGroups[pid]; var pname=(g[0]&&g[0].project_name)?g[0].project_name:pid;
         st.appendChild(obSectionRow(pname));
         g.sort(function(a,b){ return (""+(a.name||"")).localeCompare(""+(b.name||"")); });
-        g.forEach(function(r){ st.appendChild(obMakeRow(r.key,obCleanName(r),"auto",r.days)); });
+        g.forEach(function(r){ st.appendChild(obMakeRow(r.key,obCleanName(r),"auto",r.days,{})); });
       });
-      // --- forudfyldning af default-fill raekken ---
-      if(obGrid.fillKey){
-        var fr=Array.from(document.querySelectorAll("#observices tbody tr.drow")).find(function(tr){return tr.dataset.key===obGrid.fillKey;});
-        if(fr){ for(var i=0;i<7;i++){ var d=new Date(obMonday); d.setDate(d.getDate()+i);
-          var s=(obGrid.prefillFill||{})[iso(d)]||0; var cell=fr.children[i+1].querySelector("input");
-          if(s>0 && !cell.value){ cell.value=s; } } }
+      // init "Arbejdstid i alt" pr. dag
+      var tr=obTotalRow();
+      for(var i=0;i<7;i++){
+        var S=obSumServices(i), O=obFillVal(i), storedWork=S+O;
+        var ti=tr.children[i+1].querySelector("input");
+        if(storedWork>0){ ti.value=obToInput(storedWork); ti.dataset.manual="1"; }
+        else { ti.value=""; ti.dataset.manual="0"; }
       }
       obRecalc();
       obFitText();
     }
-    function obApplyAbsenceZeroing(){
-      if(!obGrid||!obGrid.fillKey) return;
-      var fr=Array.from(document.querySelectorAll("#observices tbody tr.drow")).find(function(tr){return tr.dataset.key===obGrid.fillKey;});
-      if(!fr) return;
-      for(var i=0;i<7;i++){
-        var absSum=0;
-        document.querySelectorAll("#obabsence tbody tr").forEach(function(tr){ absSum+=parseFloat(tr.children[i+1].querySelector("input").value)||0; });
-        if(absSum>=7){ fr.children[i+1].querySelector("input").value=""; }
-      }
-    }
     function obRecalc(){
-      obApplyAbsenceZeroing();
+      var tr=obTotalRow(), fr=obFillRow();
       var h='<h3>Daglig balance</h3><div class="panel"><table class="gtbl">'+
             '<colgroup><col><col><col><col><col><col><col><col></colgroup>'+
             '<tr><th></th><th>Man</th><th>Tir</th><th>Ons</th><th>Tor</th><th>Fre</th><th>L\u00f8r</th><th>S\u00f8n</th></tr><tr><td>Sum</td>';
       for(var i=0;i<7;i++){
-        var dayNorm=(i>=5)?0:obNORM;   // weekend: udgangspunkt = 0 timer
-        var sum=0;
-        document.querySelectorAll("#obabsence tbody tr, #observices tbody tr.drow").forEach(function(tr){ sum+=parseFloat(tr.children[i+1].querySelector("input").value)||0; });
-        var cls=Math.abs(sum-dayNorm)<=obTOL?"ok":(sum<dayNorm?"under":"over");
-        var mark=Math.abs(sum-dayNorm)<=obTOL?("\u2713 "+fmt(sum)):(fmt(sum)+" ("+(sum-dayNorm>0?"+":"")+fmt(sum-dayNorm)+")");
+        var dayNorm=(i>=5)?0:obNORM;
+        var S=obSumServices(i), absSum=obSumAbsence(i);
+        var ti=tr.children[i+1].querySelector("input");
+        var manual=ti.dataset.manual==="1";
+        var T;
+        if(manual){ T=obVal(ti); if(T<S){ T=S; ti.value=obToInput(T); } }
+        else { T=Math.max(S, Math.max(0, dayNorm-absSum)); ti.value=obToInput(T); }
+        var O=Math.max(0, Math.round((T-S)*100)/100);
+        if(fr){ fr.children[i+1].querySelector("input").value=obToInput(O); }
+        var accounted=T+absSum;
+        var cls=Math.abs(accounted-dayNorm)<=obTOL?"ok":(accounted<dayNorm?"under":"over");
+        var mark=Math.abs(accounted-dayNorm)<=obTOL?("\u2713 "+fmt(accounted)):(fmt(accounted)+" ("+(accounted-dayNorm>0?"+":"")+fmt(accounted-dayNorm)+")");
         h+="<td class='"+cls+"'>"+mark+"</td>";
       }
       h+="</tr></table></div>";
@@ -504,10 +527,11 @@
       var em=document.getElementById("emp").value;
       if(!em){ return; }
       var rows=[];
-      document.querySelectorAll("#obabsence tbody tr, #observices tbody tr.drow").forEach(function(tr){
+      document.querySelectorAll("#obabsence tbody tr.drow, #observices tbody tr.drow").forEach(function(tr){
+        if(tr.dataset.role==="total") return;
         var days=[];
         for(var i=0;i<7;i++){ var d=new Date(obMonday); d.setDate(d.getDate()+i);
-          days.push({date:iso(d),hours:parseFloat(tr.children[i+1].querySelector("input").value)||0}); }
+          days.push({date:iso(d),hours:obVal(tr.children[i+1].querySelector("input"))}); }
         rows.push({key:tr.dataset.key,name:tr.dataset.name||tr.children[0].innerText,kind:tr.dataset.kind,days:days});
       });
       api("saveWeek","POST",{payload:{userEmail:em,gridJson:JSON.stringify({rows:rows})}})
