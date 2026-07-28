@@ -170,13 +170,16 @@
         inp.type="number"; inp.step="0.1"; inp.min="0"; inp.max="24";
         if(days&&days[i]){ inp.value=toInput(days[i].hours||0); if(days[i].locked){inp.disabled=true; td.className="locked";} }
         if(opts.role==="fill"){ inp.readOnly=true; inp.className="ro"; inp.tabIndex=-1; }
-        else if(opts.role==="total"){ inp.oninput=onTotalInput; }
+        else if(opts.role==="total"){ inp.oninput=onTotalInput; inp.onblur=onTotalBlur; }
         else { inp.oninput=recalc; }
         td.appendChild(inp); tr.appendChild(td);
       }
       return tr;
     }
-    function onTotalInput(e){ var inp=e.target; inp.dataset.manual=(inp.value.trim()==="")?"0":"1"; recalc(); }
+    // Under aktiv redigering af totalfeltet: klamp ALDRIG (saa man kan taste frit).
+    function onTotalInput(e){ e.target.dataset.manual="1"; recalc(); }
+    // Ved forladelse: tom -> tilbage til auto; ellers snap op til ydelses-gulvet.
+    function onTotalBlur(e){ var inp=e.target; if(inp.value.trim()===""){ inp.dataset.manual="0"; } recalc(); }
     function fitText(){
       var spans=document.querySelectorAll("#services tbody span.svcname, #absence tbody span.svcname");
       spans.forEach(function(sp){
@@ -269,11 +272,17 @@
         var ti=tr.children[i+1].querySelector("input");
         var manual=ti.dataset.manual==="1";
         var T;
-        if(manual){ T=val(ti); if(T<S){ T=S; ti.value=toInput(T); } }
-        else { T=Math.max(S, Math.max(0, dayNorm-absSum)); ti.value=toInput(T); }
-        var O=Math.max(0, round2(T-S));
+        if(manual){
+          T=val(ti);
+          // snap kun op til ydelses-gulvet naar feltet IKKE er i fokus (dvs. aendring kom fra en ydelsescelle eller ved blur)
+          if(T<S && document.activeElement!==ti){ T=S; ti.value=toInput(T); }
+        } else {
+          T=Math.max(S, Math.max(0, dayNorm-absSum)); ti.value=toInput(T);
+        }
+        var work=Math.max(T,S);              // reel arbejdstid; opsamling aldrig negativ
+        var O=Math.max(0, round2(work-S));
         if(fr){ fr.children[i+1].querySelector("input").value=toInput(O); }
-        var accounted=T+absSum;
+        var accounted=work+absSum;
         var cls=Math.abs(accounted-dayNorm)<=TOL?"ok":(accounted<dayNorm?"under":"over");
         var mark=Math.abs(accounted-dayNorm)<=TOL?("\u2713 "+fmt(accounted)):(fmt(accounted)+" ("+(accounted-dayNorm>0?"+":"")+fmt(accounted-dayNorm)+")");
         h+="<td class='"+cls+"'>"+mark+"</td>";
@@ -384,10 +393,9 @@
     function loadBalance(){
       var now=new Date(), y=now.getFullYear();
       var pf=document.getElementById("balFrom").value, pt=document.getElementById("balTo").value;
-      var lo=new Date(y,0,1); // altid mindst fra 1. jan (til YTD)
+      var lo=new Date(y,0,1);
       if(pf){ var pfd=parseISO(pf); if(pfd<lo) lo=pfd; }
       var hi=new Date(now); if(pt){ var ptd=parseISO(pt); if(ptd>hi) hi=ptd; }
-      // udvid lidt hvis "al tid" ellers ingen periode
       api("get_my_balance","POST",{payload:{fromStr:iso(lo),toStr:iso(hi)}})
         .then(function(r){ BAL=unwrap(r)||{}; renderBal(); })
         .catch(function(e){ document.getElementById("balCards").innerHTML='<div class="bcard"><div class="lbl">Fejl</div><div class="sub">'+JSON.stringify(e)+'</div></div>'; });
