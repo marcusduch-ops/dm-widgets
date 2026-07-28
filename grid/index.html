@@ -1,274 +1,141 @@
-<!DOCTYPE html>
-<html lang="da">
-<head>
-  <meta charset="utf-8">
-  <base target="_top">
-  <script src="https://static.zohocdn.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
-  <style>
-    :root{--accent:#E6335A;--accent-dark:#C71F45;--navy:#1f2d5a;--bg:#f4f6f8;--line:#e3e6ea;--ink:#2a2f45;--firstcol:260px}
-    body{font-family:Arial,Helvetica,sans-serif;margin:0;background:var(--bg);color:var(--ink)}
-    .wrap{padding:16px}
-    .head{display:flex;gap:8px;align-items:center;margin-bottom:14px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-    .head button{padding:6px 12px;border:1px solid #cfd4da;background:#fff;border-radius:6px;cursor:pointer;font-size:14px}
-    .head button:hover{background:#f0f2f5}
-    #weeklabel{font-weight:700;color:var(--navy)}
-    .save{margin-left:auto;background:var(--accent)!important;color:#fff!important;border:none!important;font-weight:600}
-    .save:hover{background:var(--accent-dark)!important}
-    h3{color:var(--navy);font-size:15px;margin:14px 0 6px}
-    .panel{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04);margin-bottom:12px}
-    table{border-collapse:collapse;width:100%;table-layout:fixed}
-    th,td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:6px 8px;text-align:center;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    th:last-child,td:last-child{border-right:none}
-    th{background:var(--accent);color:#fff;font-weight:600}
-    th:first-child,td:first-child{text-align:left;width:var(--firstcol);white-space:normal}
-    col.day{width:auto}
-    td input{width:100%;box-sizing:border-box;text-align:right;border:1px solid #d5d9df;border-radius:4px;padding:3px 4px}
-    td input:focus{outline:2px solid var(--accent);border-color:var(--accent)}
-    .locked{background:#f1f1f1;color:#888}
-    tr.section td{background:#eef1f6;color:var(--navy);font-weight:700;text-align:left;font-size:13px;border-right:none}
-    td:first-child span.svcname{display:inline-block;max-width:calc(var(--firstcol) - 32px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;line-height:1.2}
-    button.rmrow{float:right;background:none;border:none;color:var(--accent-dark);cursor:pointer;font-size:16px;line-height:1;padding:0 2px;visibility:hidden}
-    tr.drow:hover button.rmrow{visibility:visible}
-    .addbtn{background:#fff;border:1px dashed var(--accent);color:var(--accent);border-radius:6px;padding:7px 14px;cursor:pointer;font-size:14px;font-weight:600}
-    .addbtn:hover{background:#fbe9ee}
-    .ok{color:#137333;font-weight:600}.under{color:#d97706;font-weight:600}.over{color:var(--accent-dark);font-weight:700}
-    #modal{display:none;position:fixed;inset:0;background:rgba(20,25,50,.4);align-items:center;justify-content:center;z-index:50}
-    #modal .box{background:#fff;padding:20px;border-radius:12px;width:440px;max-height:82vh;overflow:auto;margin:auto;box-shadow:0 8px 30px rgba(0,0,0,.25)}
-    #modal .box strong{color:var(--navy);font-size:16px}
-    #modal input,#modal select{width:100%;padding:7px;margin:5px 0;box-sizing:border-box;border:1px solid #cfd4da;border-radius:6px}
-    #modal .box>button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-weight:600}
-    #modal .box>button:hover{background:var(--accent-dark)}
-    #catalog .row{display:flex;justify-content:space-between;padding:7px 4px;border-bottom:1px solid #eee;align-items:center}
-    #catalog .row button{background:var(--accent);color:#fff;border:none;border-radius:5px;padding:4px 12px;cursor:pointer}
-    #catalog .row button:disabled{background:#c9ccd2;cursor:default}
-    #balance .panel{margin-top:4px}
-  </style>
-</head>
-<body>
- <div class="wrap">
-  <div class="head">
-    <button onclick="shiftWeek(-1)">&larr; Forrige</button>
-    <span id="weeklabel">Uge ...</span>
-    <button onclick="shiftWeek(1)">N&aelig;ste &rarr;</button>
-    <button onclick="thisWeek()">I dag</button>
-    <button class="save" onclick="saveWeek()">Gem uge</button>
-  </div>
-  <h3>Frav&aelig;r</h3>
-  <div class="panel"><table id="absence">
-    <colgroup><col class="first"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"></colgroup>
-    <thead><tr><th>Type</th><th>Man</th><th>Tir</th><th>Ons</th><th>Tor</th><th>Fre</th><th>L&oslash;r</th><th>S&oslash;n</th></tr></thead><tbody></tbody></table></div>
-  <h3>Ydelser</h3>
-  <div class="panel"><table id="services">
-    <colgroup><col class="first"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"></colgroup>
-    <thead><tr><th>Ydelse</th><th>Man</th><th>Tir</th><th>Ons</th><th>Tor</th><th>Fre</th><th>L&oslash;r</th><th>S&oslash;n</th></tr></thead><tbody></tbody></table></div>
-  <button class="addbtn" onclick="openCatalog()">+ Tilf&oslash;j ydelse</button>
-  <div id="balance"></div>
- </div>
-  <div id="modal"><div class="box">
-    <div style="display:flex;justify-content:space-between;align-items:center"><strong>Tilf&oslash;j en ydelse</strong><span style="cursor:pointer;font-size:20px" onclick="closeCatalog()">&times;</span></div>
-    <input id="search" placeholder="S&oslash;g..." oninput="renderCatalog()">
-    <div id="catalog"></div><hr>
-    <p style="font-size:12px;color:#8a90a0;margin:6px 0">Nye projekter og arbejdspakker oprettes i modulet &bdquo;Projekter &amp; arbejdspakker&ldquo;. Her kan du oprette nye <strong>interne kategorier</strong>.</p>
-    <button onclick="document.getElementById('createnew').style.display='block'">+ Opret ny intern kategori</button>
-    <div id="createnew" style="display:none">
-      <input id="newname" placeholder="Navn p&aring; intern kategori">
-      <button onclick="createNew()">Opret &amp; tilf&oslash;j</button>
-    </div>
-  </div></div>
-  <script>
-    var WORKSPACE="danskemaritime", NORM=7.4, TOL=0.05;
-    var monday, grid, catalog=[];
-    function api(name,method,extra){
-      var cfg={api_name:name,workspace_name:WORKSPACE,http_method:method};
-      if(extra){ for(var k in extra){ cfg[k]=extra[k]; } }
-      return ZOHO.CREATOR.DATA.invokeCustomApi(cfg);
-    }
-    function unwrap(r){ var x=(r&&r.result!==undefined)?r.result:(r&&r.data!==undefined?r.data:r); if(typeof x==="string"){try{x=JSON.parse(x);}catch(e){}} return x; }
-    function iso(d){ return d.toISOString().slice(0,10); }
-    function fmt(n){ return (Math.round(n*100)/100).toString().replace(".",","); }
-    function initMonday(){ var d=new Date(); var dow=(d.getDay()+6)%7; d.setDate(d.getDate()-dow); monday=d; }
-    function loadWeek(){
-      api("get_week_grid","POST",{payload:{userEmail:"self",mondayStr:iso(monday)}})
-        .then(function(r){ grid=unwrap(r); render(); })
-        .catch(function(e){ document.getElementById("balance").innerText="Fejl ved indl\u00e6sning: "+JSON.stringify(e); });
-    }
-    // vis kun arbejdspakke-navnet (projektnavn staar som sektionsoverskrift)
-    function cleanName(r){
-      var n=r.name||r.key;
-      if(r.project_name){
-        var pfx=r.project_name+": ";
-        if(n.indexOf(pfx)===0){ n=n.substring(pfx.length); }
-      }
-      return n;
-    }
-    function sectionRow(title){
-      var tr=document.createElement("tr"); tr.className="section";
-      var td=document.createElement("td"); td.colSpan=8; td.innerText=title;
-      tr.appendChild(td); return tr;
-    }
-    function makeRow(key,name,kind,days,opts){
-      opts=opts||{};
-      var tr=document.createElement("tr"); tr.className="drow"; tr.dataset.key=key; tr.dataset.kind=kind; tr.dataset.name=name;
-      var td0=document.createElement("td");
-      var sp=document.createElement("span"); sp.className="svcname"; sp.innerText=name; sp.title=name; td0.appendChild(sp);
-      if(opts.removable){
-        var x=document.createElement("button"); x.className="rmrow"; x.title="Fjern fra mit skema"; x.innerHTML="&times;";
-        x.onclick=function(){ removeService(key); };
-        td0.appendChild(x);
-      }
-      tr.appendChild(td0);
-      for(var i=0;i<7;i++){
-        var td=document.createElement("td"), inp=document.createElement("input");
-        inp.type="number"; inp.step="0.1"; inp.min="0"; inp.max="24";
-        if(days&&days[i]){ inp.value=days[i].hours||""; if(days[i].locked){inp.disabled=true; td.className="locked";} }
-        inp.oninput=recalc; td.appendChild(inp); tr.appendChild(td);
-      }
-      return tr;
-    }
-    // skru skriftstoerrelsen ned indtil hele navnet passer i foerste kolonne
-    function fitText(){
-      var spans=document.querySelectorAll("#services tbody span.svcname, #absence tbody span.svcname");
-      spans.forEach(function(sp){
-        var size=14; sp.style.fontSize=size+"px";
-        var guard=0;
-        while(sp.scrollWidth>sp.clientWidth && size>9 && guard<40){ size-=0.5; sp.style.fontSize=size+"px"; guard++; }
-      });
-    }
-    function render(){
-      document.getElementById("weeklabel").innerText="Uge fra "+iso(monday);
-      if(grid.norm){ NORM = grid.norm; }
-      // --- Fravaer ---
-      var at=document.querySelector("#absence tbody"); at.innerHTML="";
-      (grid.absence||[]).forEach(function(a){
-        var tr=makeRow(a.key,a.name,"absence",a.days,{removable:false});
-        if(a.key==="fravaer:ferie" && !grid.callerIsAdmin){
-          tr.querySelectorAll("input").forEach(function(inp){ inp.disabled=true; });
-          tr.title="Ferie registreres via en anmodning \u2013 ikke direkte i skemaet.";
-        }
-        at.appendChild(tr);
-      });
-      // --- Ydelser: grupperet ---
-      var st=document.querySelector("#services tbody"); st.innerHTML="";
-      var all=(grid.rows||[]).slice();
-      var fillRow=null, internals=[], projGroups={}, projOrder=[];
-      all.forEach(function(r){
-        if(r.isFill){ fillRow=r; return; }
-        if(r.kind==="project"){
-          var pid=r.project_id||"(uden projekt)";
-          if(!projGroups[pid]){ projGroups[pid]=[]; projOrder.push(pid); }
-          projGroups[pid].push(r);
-        } else { internals.push(r); }
-      });
-      internals.sort(function(a,b){ return (a.sort_order||999)-(b.sort_order||999); });
-      // Sektion 1: interne
-      st.appendChild(sectionRow("Interne timer & kategorier"));
-      if(fillRow){ st.appendChild(makeRow(fillRow.key,fillRow.name,"auto",fillRow.days,{removable:false})); }
-      internals.forEach(function(r){ st.appendChild(makeRow(r.key,cleanName(r),"auto",r.days,{removable:!r.extra})); });
-      // Sektioner: projekter (sorteret paa projektnavn)
-      projOrder.sort(function(a,b){
-        var na=(projGroups[a][0]&&projGroups[a][0].project_name)?projGroups[a][0].project_name:a;
-        var nb=(projGroups[b][0]&&projGroups[b][0].project_name)?projGroups[b][0].project_name:b;
-        return (""+na).localeCompare(""+nb);
-      });
-      projOrder.forEach(function(pid){
-        var g=projGroups[pid];
-        var pname=(g[0]&&g[0].project_name)?g[0].project_name:pid;
-        st.appendChild(sectionRow(pname));
-        g.sort(function(a,b){ return (""+(a.name||"")).localeCompare(""+(b.name||"")); });
-        g.forEach(function(r){ st.appendChild(makeRow(r.key,cleanName(r),"auto",r.days,{removable:!r.extra})); });
-      });
-      // --- forudfyldning af default-fill raekken ---
-      if(grid.fillKey){
-        var fr=Array.from(document.querySelectorAll("#services tbody tr.drow")).find(function(tr){return tr.dataset.key===grid.fillKey;});
-        if(fr){ for(var i=0;i<7;i++){ var d=new Date(monday); d.setDate(d.getDate()+i);
-          var s=(grid.prefillFill||{})[iso(d)]||0; var cell=fr.children[i+1].querySelector("input");
-          if(s>0 && !cell.value){ cell.value=s; } } }
-      }
-      recalc();
-      fitText();
-    }
-    function applyAbsenceZeroing(){
-      if(!grid||!grid.fillKey) return;
-      var fr=Array.from(document.querySelectorAll("#services tbody tr.drow")).find(function(tr){return tr.dataset.key===grid.fillKey;});
-      if(!fr) return;
-      for(var i=0;i<7;i++){
-        var absSum=0;
-        document.querySelectorAll("#absence tbody tr").forEach(function(tr){ absSum+=parseFloat(tr.children[i+1].querySelector("input").value)||0; });
-        if(absSum>=7){ fr.children[i+1].querySelector("input").value=""; }
-      }
-    }
-    function recalc(){
-      applyAbsenceZeroing();
-      var h='<h3>Daglig balance</h3><div class="panel"><table>'+
-            '<colgroup><col class="first"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"><col class="day"></colgroup>'+
-            '<tr><th></th><th>Man</th><th>Tir</th><th>Ons</th><th>Tor</th><th>Fre</th><th>L\u00f8r</th><th>S\u00f8n</th></tr><tr><td>Sum</td>';
-      for(var i=0;i<7;i++){
-        var dayNorm = (i>=5) ? 0 : NORM;   // weekend: udgangspunkt = 0 timer
-        var sum=0;
-        document.querySelectorAll("#absence tbody tr, #services tbody tr.drow").forEach(function(tr){ sum+=parseFloat(tr.children[i+1].querySelector("input").value)||0; });
-        var cls=Math.abs(sum-dayNorm)<=TOL?"ok":(sum<dayNorm?"under":"over");
-        var mark=Math.abs(sum-dayNorm)<=TOL?("\u2713 "+fmt(sum)):(fmt(sum)+" ("+(sum-dayNorm>0?"+":"")+fmt(sum-dayNorm)+")");
-        h+="<td class='"+cls+"'>"+mark+"</td>";
-      }
-      h+="</tr></table></div>"; document.getElementById("balance").innerHTML=h;
-    }
-    function shiftWeek(n){ monday.setDate(monday.getDate()+n*7); loadWeek(); }
-    function thisWeek(){ initMonday(); loadWeek(); }
-    function saveWeek(){
-      var rows=[];
-      document.querySelectorAll("#absence tbody tr, #services tbody tr.drow").forEach(function(tr){
-        var days=[];
-        for(var i=0;i<7;i++){ var d=new Date(monday); d.setDate(d.getDate()+i);
-          days.push({date:iso(d),hours:parseFloat(tr.children[i+1].querySelector("input").value)||0}); }
-        rows.push({key:tr.dataset.key,name:tr.dataset.name||tr.children[0].innerText,kind:tr.dataset.kind,days:days});
-      });
-      api("saveWeek","POST",{payload:{userEmail:"self",gridJson:JSON.stringify({rows:rows})}})
-        .then(function(r){ alert("Gemt: "+JSON.stringify(unwrap(r))); loadWeek(); })
-        .catch(function(e){ alert("Fejl ved gemning: "+JSON.stringify(e)); });
-    }
-    function openCatalog(){
-      document.getElementById("modal").style.display="flex";
-      document.getElementById("createnew").style.display="none";
-      document.getElementById("search").value="";
-      api("get_active_services","GET",{}).then(function(r){ catalog=unwrap(r)||[]; renderCatalog(); });
-    }
-    function closeCatalog(){ document.getElementById("modal").style.display="none"; }
-    function renderCatalog(){
-      var q=(document.getElementById("search").value||"").toLowerCase();
-      var list=document.getElementById("catalog"); list.innerHTML="";
-      var already=new Set(Array.from(document.querySelectorAll("#services tbody tr.drow")).map(function(tr){return tr.dataset.key;}));
-      catalog.filter(function(x){return x.name.toLowerCase().indexOf(q)>-1||x.key.toLowerCase().indexOf(q)>-1;})
-        .forEach(function(x){
-          var row=document.createElement("div"); row.className="row";
-          var lbl=document.createElement("span"); lbl.innerText=x.name+" ("+x.key+")";
-          var btn=document.createElement("button");
-          if(already.has(x.key)){ btn.innerText="Tilf\u00f8jet"; btn.disabled=true; } else { btn.innerText="Tilf\u00f8j"; btn.onclick=function(){addToGrid(x);}; }
-          row.appendChild(lbl); row.appendChild(btn); list.appendChild(row);
-        });
-    }
-    function addToGrid(x){
-      api("add_user_service","POST",{payload:{serviceKey:x.key}})
-        .then(function(){ closeCatalog(); loadWeek(); })
-        .catch(function(e){ alert("Kunne ikke tilf\u00f8je: "+JSON.stringify(e)); });
-    }
-    function removeService(key){
-      if(!confirm("Fjern denne ydelse fra dit skema? Allerede registrerede timer bevares.")) return;
-      api("remove_user_service","POST",{payload:{serviceKey:key}})
-        .then(function(){ loadWeek(); })
-        .catch(function(e){ alert("Kunne ikke fjerne: "+JSON.stringify(e)); });
-    }
-    function createNew(){
-      var name=document.getElementById("newname").value.trim();
-      if(!name){ alert("Navn er p\u00e5kr\u00e6vet"); return; }
-      api("create_service","POST",{payload:{type:"category",name:name,code:""}}).then(function(r){
-        var x=unwrap(r);
-        if(x.status==="OK"){ addToGrid(x);
-          document.getElementById("newname").value="";
-          document.getElementById("createnew").style.display="none";
-        } else { alert(x.message||"Kunne ikke oprette"); }
-      });
-    }
-    initMonday(); loadWeek();
-  </script>
-</body>
-</html>
+string admin_save_project(string projectJson)
+{
+	caller = zoho.loginuserid;
+	data = projectJson.toMap();
+	pid = ifnull(data.get("project_id"),"").trim();
+	pname = ifnull(data.get("project_name"),"").trim();
+	if(pname == "")
+	{
+		return "FEJL: Projektnavn er paakraevet.";
+	}
+	if(pid == "")
+	{
+		base = "p_" + pname.toLowerCase().trim().replaceAll(" ","_");
+		candidate = base;
+		if(projects[project_id == candidate].count() > 0)
+		{
+			for each  i in {1,2,3,4,5,6,7,8,9}
+			{
+				trycand = base + "_" + i;
+				if(projects[project_id == trycand].count() == 0)
+				{
+					candidate = trycand;
+					break;
+				}
+			}
+		}
+		pid = candidate;
+	}
+	existP = projects[project_id == pid];
+	if(existP.count() > 0)
+	{
+		for each  rec in existP
+		{
+			rec.project_name=pname;
+			rec.active=true;
+		}
+	}
+	else
+	{
+		insert into projects
+		[
+			project_id=pid
+			project_name=pname
+			time_budget=0
+			active=true
+			Added_User=zoho.loginuser
+		]
+	}
+	wps = ifnull(data.get("work_packages"),List());
+	createdWp = 0;
+	updatedWp = 0;
+	assigned = 0;
+	sumBudget = 0;
+	usedNums = List();
+	for each  w in work_packages[project_id == pid]
+	{
+		usedNums.add(w.work_package_id);
+	}
+	nextIdx = usedNums.size() + 1;
+	for each  wp in wps
+	{
+		wpid = ifnull(wp.get("work_package_id"),"").trim();
+		wpname = ifnull(wp.get("name"),"").trim();
+		if(wpname != "")
+		{
+			wpbudget = ifnull(wp.get("budget"),0).toDecimal();
+			sumBudget = sumBudget + wpbudget;
+			if(wpid == "")
+			{
+				cand = "wp-" + nextIdx;
+				if(usedNums.contains(cand))
+				{
+					for each  j in {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20}
+					{
+						c2 = "wp-" + j;
+						if(!usedNums.contains(c2))
+						{
+							cand = c2;
+							break;
+						}
+					}
+				}
+				wpid = cand;
+				usedNums.add(wpid);
+				nextIdx = nextIdx + 1;
+			}
+			existW = work_packages[project_id == pid && work_package_id == wpid];
+			if(existW.count() > 0)
+			{
+				for each  rw in existW
+				{
+					rw.name=wpname;
+					rw.project_name=pname;
+					rw.time_budget=wpbudget;
+					rw.active=true;
+				}
+				updatedWp = updatedWp + 1;
+			}
+			else
+			{
+				insert into work_packages
+				[
+					work_package_id=wpid
+					name=wpname
+					code=wpid
+					project_id=pid
+					project_name=pname
+					time_budget=wpbudget
+					active=true
+					Added_User=zoho.loginuser
+				]
+				createdWp = createdWp + 1;
+			}
+			skey = pid + ":" + wpid;
+			userList = ifnull(wp.get("users"),List());
+			for each  em in userList
+			{
+				emClean = em.trim().toLowerCase();
+				if(emClean != "")
+				{
+					if(user_services[user_email == emClean && service_key == skey].count() == 0)
+					{
+						insert into user_services
+						[
+							user_email=emClean
+							service_key=skey
+							sort_order=500
+							Added_User=zoho.loginuser
+						]
+						assigned = assigned + 1;
+					}
+				}
+			}
+		}
+	}
+	for each  pr in projects[project_id == pid]
+	{
+		pr.time_budget=sumBudget;
+	}
+	return "OK. Projekt:" + pid + " | AP oprettet:" + createdWp + ", opdateret:" + updatedWp + ", nye brugertildelinger:" + assigned + " | Samlet budget:" + sumBudget;
+}
