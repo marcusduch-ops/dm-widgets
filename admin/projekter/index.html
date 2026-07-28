@@ -39,15 +39,14 @@
     .msg.ok{color:#137333}.msg.err{color:var(--accent-dark)}
     .info{padding:16px;color:#8a90a0}
     .empty{color:#8a90a0;font-size:13px;font-style:italic}
+    .sumtag{font-size:13px;color:var(--navy);font-weight:700;margin-top:8px}
   </style>
 </head>
 <body>
  <div class="wrap">
   <h2>Projekter &amp; arbejdspakker</h2>
-  <p class="sub">Opret nye projekter, tilf&oslash;j arbejdspakker, og tildel medarbejdere &ndash; alt p&aring; &eacute;n side. N&oslash;gler genereres automatisk.</p>
-
+  <p class="sub">Opret nye projekter, tilf&oslash;j arbejdspakker, og tildel medarbejdere &ndash; alt p&aring; &eacute;n side. N&oslash;gler genereres automatisk. Projektets samlede budget er summen af arbejdspakkernes budgetter.</p>
   <div id="gate" class="info">Indl&aelig;ser&hellip;</div>
-
   <div id="app" style="display:none">
     <div class="panel">
       <h3>1. V&aelig;lg projekt</h3>
@@ -58,7 +57,6 @@
         <button class="btn ghost" onclick="newProject()">+ Nyt projekt</button>
       </div>
     </div>
-
     <div class="panel">
       <h3>2. Projektoplysninger</h3>
       <div class="row2">
@@ -66,35 +64,28 @@
           <label>Projektnavn</label>
           <input type="text" id="pname" placeholder="fx Danish Maritime Data Hub">
         </div>
-        <div>
-          <label>Budget (timer)</label>
-          <input type="number" id="pbudget" step="0.1" min="0" placeholder="fx 1600">
-        </div>
       </div>
       <div id="pidTag" class="wptag" style="margin-top:8px"></div>
     </div>
-
     <div class="panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <h3 style="margin:0">3. Arbejdspakker</h3>
         <button class="btn alt" onclick="addWp()">+ Tilf&oslash;j arbejdspakke</button>
       </div>
       <div id="wps"></div>
+      <div id="budgetSum" class="sumtag"></div>
     </div>
-
     <div class="foot">
       <button id="saveBtn" class="btn" onclick="save()">Gem projekt</button>
       <span id="msg" class="msg"></span>
     </div>
   </div>
  </div>
-
  <script>
    var WORKSPACE="danskemaritime";
    var SETUP=null;      // full setup from server
    var EMPLOYEES=[];    // [{email,name}]
    var wpSeq=0;         // unique DOM ids for wp rows
-
    function api(name,method,extra){
      var cfg={api_name:name,workspace_name:WORKSPACE,http_method:method};
      if(extra){ for(var k in extra){ cfg[k]=extra[k]; } }
@@ -103,8 +94,8 @@
    function unwrap(r){ var x=(r&&r.result!==undefined)?r.result:(r&&r.data!==undefined?r.data:r); if(typeof x==="string"){try{x=JSON.parse(x);}catch(e){}} return x; }
    function esc(s){ return (""+(s==null?"":s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
    function numDa(v){ if(v==null||v==="") return 0; return parseFloat((""+v).replace(",",".").trim())||0; }
+   function fmt(n){ return (Math.round(n*100)/100).toString().replace(".",","); }
    function showMsg(t,cls){ var m=document.getElementById("msg"); m.innerText=t; m.className="msg "+(cls||""); }
-
    // ---------- init ----------
    function load(){
      api("admin_get_setup","GET",{})
@@ -122,7 +113,6 @@
        })
        .catch(function(e){ document.getElementById("gate").innerText="Fejl ved indl\u00e6sning: "+JSON.stringify(e); });
    }
-
    function fillProjectPicker(){
      var sel=document.getElementById("projPicker");
      sel.innerHTML='<option value="">\u2014 Nyt projekt \u2014</option>';
@@ -132,32 +122,29 @@
        sel.add(o);
      });
    }
-
    // ---------- project mode ----------
    function newProject(){
      document.getElementById("projPicker").value="";
      document.getElementById("pname").value="";
-     document.getElementById("pbudget").value="";
      document.getElementById("pidTag").innerText="Ny n\u00f8gle genereres automatisk ved gem.";
      document.getElementById("wps").innerHTML="";
      addWp();
+     updateBudgetSum();
      showMsg("");
    }
-
    function onPickProject(){
      var pid=document.getElementById("projPicker").value;
      if(!pid){ newProject(); return; }
      var p=(SETUP.projects||[]).find(function(x){return x.project_id===pid;});
      if(!p){ newProject(); return; }
      document.getElementById("pname").value=p.project_name||"";
-     document.getElementById("pbudget").value=(p.budget!=null? (""+p.budget).replace(".",","):"");
      document.getElementById("pidTag").innerText="N\u00f8gle: "+p.project_id;
      document.getElementById("wps").innerHTML="";
      (p.work_packages||[]).forEach(function(w){ addWp(w); });
      if(!p.work_packages || p.work_packages.length===0){ addWp(); }
+     updateBudgetSum();
      showMsg("");
    }
-
    // ---------- work package rows ----------
    function addWp(w){
      wpSeq++;
@@ -173,7 +160,7 @@
          '<button class="rm" title="Fjern r\u00e6kke" onclick="rmWp(\''+id+'\')">&times;</button></div>'+
        '<div class="row2">'+
          '<div><label>Arbejdspakke-navn</label><input type="text" class="wpname" value="'+esc(w&&w.name?w.name:"")+'" placeholder="fx WP-1 Behovsafd\u00e6kning"></div>'+
-         '<div><label>Budget (timer)</label><input type="number" step="0.1" min="0" class="wpbudget" value="'+(w&&w.budget!=null?(""+w.budget).replace(".",","):"")+'" placeholder="fx 250"></div>'+
+         '<div><label>Budget (timer)</label><input type="number" step="0.1" min="0" class="wpbudget" oninput="updateBudgetSum()" value="'+(w&&w.budget!=null?(""+w.budget).replace(".",","):"")+'" placeholder="fx 250"></div>'+
        '</div>'+
        '<label>Tildelte medarbejdere</label>'+
        '<div class="chips"></div>'+
@@ -182,22 +169,25 @@
          '<button class="btn ghost" onclick="addUser(\''+id+'\')">+ Tilf\u00f8j</button>'+
        '</div>';
      document.getElementById("wps").appendChild(wrap);
-     // fill user dropdown
      var pick=wrap.querySelector(".userpick");
      EMPLOYEES.forEach(function(e){
        var o=document.createElement("option"); o.value=e.email; o.text=e.name+" ("+e.email+")"; pick.add(o);
      });
      renderChips(id);
+     updateBudgetSum();
    }
-
    function rmWp(id){
      var el=document.getElementById(id);
      if(el){ el.parentNode.removeChild(el); }
+     updateBudgetSum();
    }
-
+   function updateBudgetSum(){
+     var sum=0;
+     document.querySelectorAll("#wps .wp .wpbudget").forEach(function(inp){ sum+=numDa(inp.value); });
+     document.getElementById("budgetSum").innerText="Projektets samlede budget (sum af arbejdspakker): "+fmt(sum)+" timer";
+   }
    function getUsers(id){ try{ return JSON.parse(document.getElementById(id).dataset.users)||[]; }catch(e){ return []; } }
    function setUsers(id,arr){ document.getElementById(id).dataset.users=JSON.stringify(arr); }
-
    function addUser(id){
      var wrap=document.getElementById(id);
      var pick=wrap.querySelector(".userpick");
@@ -207,17 +197,14 @@
      if(arr.indexOf(em)===-1){ arr.push(em); setUsers(id,arr); renderChips(id); }
      pick.value="";
    }
-
    function removeUser(id,em){
      var arr=getUsers(id).filter(function(x){return x!==em;});
      setUsers(id,arr); renderChips(id);
    }
-
    function nameFor(em){
      var e=EMPLOYEES.find(function(x){return x.email===em;});
      return e? e.name : em;
    }
-
    function renderChips(id){
      var wrap=document.getElementById(id);
      var box=wrap.querySelector(".chips");
@@ -230,7 +217,6 @@
        box.appendChild(c);
      });
    }
-
    // ---------- save ----------
    function save(){
      var pname=document.getElementById("pname").value.trim();
@@ -238,7 +224,6 @@
      var payload={
        project_id: document.getElementById("projPicker").value || "",
        project_name: pname,
-       budget: numDa(document.getElementById("pbudget").value),
        work_packages: []
      };
      var rows=document.querySelectorAll("#wps .wp");
@@ -261,11 +246,9 @@
          var txt=(typeof res==="string")?res:JSON.stringify(res);
          if(txt.indexOf("DENIED")===0 || txt.indexOf("FEJL")===0){ showMsg(txt,"err"); btn.disabled=false; return; }
          showMsg(txt,"ok");
-         // reload setup so keys + assignments refresh, then reselect this project
          api("admin_get_setup","GET",{}).then(function(r2){
            var d=unwrap(r2);
            if(d && d.status!=="DENIED"){ SETUP=d; EMPLOYEES=d.employees||[]; fillProjectPicker();
-             // try to reselect by name
              var match=(SETUP.projects||[]).find(function(x){return x.project_name===payload.project_name;});
              if(match){ document.getElementById("projPicker").value=match.project_id; onPickProject(); showMsg(txt,"ok"); }
            }
@@ -274,7 +257,6 @@
        })
        .catch(function(e){ showMsg("Fejl ved gem: "+JSON.stringify(e),"err"); btn.disabled=false; });
    }
-
    load();
  </script>
 </body>
