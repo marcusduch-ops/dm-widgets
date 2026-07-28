@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rejseafregning – Danske Maritime</title>
+<style>
+  :root{
+    --navy:#0B2C4D; --navy-2:#123A63; --fjord:#1D6F8F; --fjord-dark:#155A75;
+    --paper:#FFFFFF; --bg:#EEF2F6; --ink:#1C2733; --muted:#5B6B7B;
+    --line:#D4DDE6; --ok:#1E7A46; --warn:#B3541E; --danger:#A6302F;
+    --ledger:#0B2C4D;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,"Segoe UI",system-ui,Roboto,Arial,sans-serif;padding-bottom:96px}
+  .masthead{background:var(--navy);color:#fff;padding:26px 20px 22px}
+  .masthead-inner{max-width:880px;margin:0 auto}
+  .masthead h1{font-family:Georgia,"Iowan Old Style","Times New Roman",serif;font-weight:600;font-size:30px;letter-spacing:.06em;margin:0 0 2px}
+  .masthead .org{font-size:13px;letter-spacing:.18em;text-transform:uppercase;opacity:.85}
+  .masthead .rule{border-top:1px solid rgba(255,255,255,.45);border-bottom:1px solid rgba(255,255,255,.45);height:4px;margin-top:14px}
+  main{max-width:880px;margin:0 auto;padding:20px 16px 40px}
+  .intro{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:18px;font-size:14px;color:var(--muted)}
+  .intro strong{color:var(--ink)}
+  .intro ol{margin:8px 0 0;padding-left:20px}
+  .intro li{margin:3px 0}
+  section.card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:20px 22px 22px;margin-bottom:18px}
+  .eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--fjord);font-weight:700;margin-bottom:2px}
+  h2{font-family:Georgia,"Iowan Old Style",serif;font-size:20px;font-weight:600;margin:0 0 14px;color:var(--navy)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 18px}
+  .grid .wide{grid-column:1 / -1}
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:4px}
+  input[type=text],input[type=date],input[type=number],select,textarea{
+    width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:7px;font:inherit;color:var(--ink);background:#fff}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--fjord);outline-offset:1px;border-color:var(--fjord)}
+  textarea{resize:vertical;min-height:64px}
+  .hint{font-size:12px;color:var(--muted);margin-top:4px}
+  .readonly{background:#F4F7FA;color:var(--muted)}
+  /* upload */
+  .dropzone{border:2px dashed var(--line);border-radius:10px;padding:26px;text-align:center;color:var(--muted);cursor:pointer;transition:border-color .15s,background .15s}
+  .dropzone.drag{border-color:var(--fjord);background:#F0F7FA}
+  .dropzone strong{color:var(--fjord)}
+  /* copilot box */
+  .copilot{border:1px solid var(--line);border-left:4px solid var(--fjord);border-radius:8px;padding:14px 16px;margin-top:18px;background:#F8FBFC}
+  .copilot h3{margin:0 0 6px;font-size:15px;color:var(--navy)}
+  .copilot p{margin:0 0 10px;font-size:13.5px;color:var(--muted)}
+  .btnrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  button{font:inherit;font-weight:600;border:none;border-radius:8px;padding:9px 16px;cursor:pointer}
+  .btn-primary{background:var(--fjord);color:#fff}
+  .btn-primary:hover{background:var(--fjord-dark)}
+  .btn-ghost{background:#fff;color:var(--fjord);border:1px solid var(--fjord)}
+  .btn-ghost:hover{background:#F0F7FA}
+  .btn-dark{background:var(--navy);color:#fff;font-size:16px;padding:12px 26px}
+  .btn-dark:hover{background:var(--navy-2)}
+  .btn-danger{background:none;color:var(--danger);border:1px solid transparent;padding:4px 8px;font-size:13px}
+  .btn-danger:hover{text-decoration:underline}
+  .copilot textarea{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12.5px;margin:10px 0 8px}
+  .flash{font-size:13px;margin-top:6px;min-height:18px}
+  .flash.ok{color:var(--ok)} .flash.err{color:var(--danger)} .flash.warn{color:var(--warn)}
+  /* receipt cards */
+  .receipt-list{margin-top:16px;display:flex;flex-direction:column;gap:12px}
+  .receipt{display:grid;grid-template-columns:110px 1fr;gap:14px;border:1px solid var(--line);border-radius:9px;padding:12px}
+  .receipt .thumbwrap{width:110px}
+  .receipt img{width:110px;height:110px;object-fit:cover;border-radius:6px;border:1px solid var(--line);background:#F4F7FA}
+  .receipt .noimg{width:110px;height:110px;border-radius:6px;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);text-align:center;padding:6px}
+  .receipt .fields{display:flex;flex-direction:column;gap:10px;min-width:0}
+  .frow{display:grid;gap:10px;align-items:end}
+  .frow > div{min-width:0}
+  .frow1{grid-template-columns:1.1fr 1.4fr 1fr auto}
+  .chkline{display:flex;align-items:center;gap:7px;height:37px;padding:0 2px;font-size:13px;color:var(--ink);cursor:pointer;user-select:none;white-space:nowrap}
+  .chkline input{width:16px;height:16px;accent-color:var(--fjord);cursor:pointer;margin:0}
+  .firm-badge{display:inline-block;background:#EEF4F7;color:var(--fjord-dark);border:1px solid var(--fjord);border-radius:999px;padding:1px 8px;font-size:11px;font-weight:600;margin-left:8px;vertical-align:1px}
+  .frow2{grid-template-columns:1fr .8fr 1.4fr 1.1fr auto}
+  .receipt .fx-hint{font-size:11.5px;color:var(--muted);background:#F4F7FA;border-radius:6px;padding:6px 9px}
+  .ratewrap{display:flex;gap:4px}
+  .ratewrap input{flex:1;min-width:0}
+  .btn-rate{flex:none;background:#fff;color:var(--fjord);border:1px solid var(--fjord);border-radius:7px;padding:0 8px;font-size:12px;font-weight:600}
+  .btn-rate:hover{background:#F0F7FA}
+  .btn-rate:disabled{opacity:.5;cursor:default}
+  .ratenote{font-size:11.5px;color:var(--muted)}
+  .receipt .fx-hint b{color:var(--warn)}
+  .receipt .fname{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .receipt .orig{font-size:12px;color:var(--warn)}
+  @media (max-width:640px){
+    .grid{grid-template-columns:1fr}
+    .receipt{grid-template-columns:1fr}
+    .frow1{grid-template-columns:1fr 1fr}
+    .frow2{grid-template-columns:1fr 1fr}
+    .frow2 .cell-del{grid-column:1 / -1;justify-self:end}
+  }
+  /* uden bilag */
+  .ub-row{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:9px;padding:12px;margin-bottom:10px}
+  /* ledger bar */
+  .ledger{position:fixed;left:0;right:0;bottom:0;background:var(--ledger);color:#fff;z-index:50;border-top:3px double rgba(255,255,255,.5)}
+  .ledger-inner{max-width:880px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;flex-wrap:wrap}
+  .ledger .sums{display:flex;gap:26px;flex-wrap:wrap;font-size:13px}
+  .ledger .sums b{display:block;font-size:17px;font-variant-numeric:tabular-nums}
+  .ledger .sums .label{opacity:.75}
+  .ledger .payout b{font-size:20px}
+  /* print */
+  #printArea{display:none}
+  @media print{
+    body{background:#fff;padding:0}
+    body > *:not(#printArea){display:none !important}
+    #printArea{display:block;font:11.5pt/1.45 Georgia,"Times New Roman",serif;color:#000}
+    .p-doc{page-break-after:always}
+    .p-head{border-bottom:3px double #000;padding-bottom:6pt;margin-bottom:12pt}
+    .p-head h1{font-size:20pt;letter-spacing:.08em;margin:0}
+    .p-head .p-org{font-size:9pt;letter-spacing:.2em;text-transform:uppercase}
+    table.p-meta{width:100%;border-collapse:collapse;margin-bottom:12pt}
+    table.p-meta td{padding:3pt 6pt;vertical-align:top;font-size:10.5pt}
+    table.p-meta td.k{width:16%;font-weight:bold}
+    table.p-exp{width:100%;border-collapse:collapse;margin:6pt 0 14pt}
+    table.p-exp th,table.p-exp td{border:.6pt solid #000;padding:4pt 6pt;font-size:10.5pt;text-align:left}
+    table.p-exp th{background:#eee}
+    table.p-exp td.num,table.p-exp th.num{text-align:right;font-variant-numeric:tabular-nums}
+    .p-total td{font-weight:bold}
+    .p-payout{border:1.2pt solid #000;padding:6pt 10pt;font-size:12pt;font-weight:bold;display:flex;justify-content:space-between;margin:10pt 0 16pt}
+    .p-sign{display:flex;gap:40pt;margin-top:30pt}
+    .p-sign div{flex:1;border-top:.8pt solid #000;padding-top:4pt;font-size:9.5pt}
+    .p-bilag{page-break-before:always;text-align:center}
+    .p-bilag h3{font-size:11pt;text-align:left;border-bottom:.6pt solid #000;padding-bottom:4pt;margin:0 0 10pt;font-weight:normal}
+    .p-bilag img{max-width:100%;max-height:230mm;border:.5pt solid #999}
+    .p-note{font-size:9.5pt;margin-top:8pt}
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="org">Danske Maritime · Intern blanket</div>
+    <h1>REJSEAFREGNING</h1>
+    <div class="rule"></div>
+  </div>
+</header>
+
+<main>
+  <div class="intro">
+    <strong>Sådan gør du:</strong>
+    <ol>
+      <li>Udfyld rejseoplysningerne (trin 1) og upload billeder af dine kvitteringer (trin 2).</li>
+      <li>Vedhæft de samme billeder i en Copilot-chat, indsæt prompten fra knappen nedenfor, og kopiér Copilots JSON-svar tilbage hertil – felterne udfyldes automatisk. Du kan også taste manuelt.</li>
+      <li>Kontrollér beløb og valuta (valuta er fritekst, fx EUR eller CHF). Ved udenlandsk valuta henter siden automatisk <strong>ECB-dagskursen for kvitteringens dato</strong> (kræver internet; kan rettes). Endnu bedre: erstat med det <strong>faktiske DKK-beløb</strong>, der er trukket fra din konto — det vinder altid og inkluderer bankens tillæg.</li>
+      <li>Markér <strong>Firmabetalt</strong> på et bilag, hvis beløbet <em>ikke</em> skal udbetales til dig — fx fordi du betalte med tjeneste-/firmakort, eller allerede har fået beløbet refunderet. Bilaget kommer stadig med i PDF'en som dokumentation, men beløbet trækkes fra "Overføres".</li>
+      <li>Tilføj evt. udlæg uden bilag (trin 3), og tryk <strong>Opret PDF</strong>. Vælg "Gem som PDF" i printdialogen og send filen til bogholderiet.</li>
+    </ol>
+    Navn, konto og reg. nr. huskes i din browser. Øvrige data sendes ikke og gemmes ikke centralt. Brug JPG/PNG-billeder (tag et skærmbillede, hvis din telefon gemmer HEIC).
+  </div>
+
+  <!-- TRIN 1 -->
+  <section class="card">
+    <div class="eyebrow">Trin 1</div>
+    <h2>Rejseoplysninger</h2>
+    <div class="grid">
+      <div><label for="fNavn">Navn</label><input type="text" id="fNavn" autocomplete="name"></div>
+      <div><label for="fProjekt">Projekt</label><input type="text" id="fProjekt"></div>
+      <div><label for="fSted">Sted</label><input type="text" id="fSted"></div>
+      <div><label for="fFormaal">Formål (rejsens formål)</label><input type="text" id="fFormaal"></div>
+      <div><label for="fAfrejse">Afrejse dato</label><input type="date" id="fAfrejse"></div>
+      <div><label for="fHjemkomst">Hjemkomst dato</label><input type="date" id="fHjemkomst"></div>
+      <div><label for="fDage">I alt dage</label><input type="text" id="fDage" class="readonly" readonly placeholder="beregnes automatisk"></div>
+      <div></div>
+      <div><label for="fKonto">Konto nr.</label><input type="text" id="fKonto" inputmode="numeric"></div>
+      <div><label for="fReg">Reg. nr.</label><input type="text" id="fReg" inputmode="numeric"></div>
+      <div class="wide"><label for="fBem">Bemærkninger</label><textarea id="fBem"></textarea></div>
+    </div>
+    <div class="btnrow" style="margin-top:12px;justify-content:flex-end">
+      <span class="flash" id="rememberFlash" role="status" style="margin-right:auto"></span>
+      <button class="btn-danger" id="btnClearRemember" type="button">Glem mine oplysninger</button>
+    </div>
+  </section>
+
+  <!-- TRIN 2 -->
+  <section class="card">
+    <div class="eyebrow">Trin 2</div>
+    <h2>Kvitteringer (udlæg med bilag)</h2>
+
+    <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload kvitteringer">
+      Træk kvitteringsbilleder hertil, eller <strong>klik for at vælge filer</strong><br>
+      <span style="font-size:12px">JPG eller PNG · flere filer ad gangen er fint</span>
+      <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp" multiple hidden>
+    </div>
+
+    <div class="copilot">
+      <h3>Udfyld automatisk med Copilot</h3>
+      <p>1) Kopiér prompten · 2) Åbn Copilot, vedhæft de samme kvitteringsbilleder og indsæt prompten · 3) Kopiér Copilots svar (JSON) og sæt det ind herunder.</p>
+      <div class="btnrow">
+        <button class="btn-ghost" id="btnCopyPrompt" type="button">Kopiér prompt til Copilot</button>
+      </div>
+      <textarea id="copilotJson" rows="4" placeholder='Sæt Copilots JSON-svar ind her, fx [{"fileName":"IMG_1234.jpg","merchant":"DSB", ...}]'></textarea>
+      <div class="btnrow">
+        <button class="btn-primary" id="btnFill" type="button">Udfyld felter fra svaret</button>
+        <span class="flash" id="fillFlash" role="status"></span>
+      </div>
+    </div>
+
+    <div class="receipt-list" id="receiptList"></div>
+    <datalist id="curList">
+      <option>DKK</option><option>EUR</option><option>USD</option><option>GBP</option>
+      <option>SEK</option><option>NOK</option><option>CHF</option><option>PLN</option>
+      <option>THB</option><option>JPY</option>
+    </datalist>
+  </section>
+
+  <!-- TRIN 3 -->
+  <section class="card">
+    <div class="eyebrow">Trin 3</div>
+    <h2>Udlæg uden bilag</h2>
+    <div id="ubList"></div>
+    <button class="btn-ghost" id="btnAddUb" type="button">+ Tilføj linje</button>
+    <div class="hint">Fx privatforbrug der afregnes, eller småudgifter uden kvittering.</div>
+  </section>
+
+  <section class="card" style="text-align:center">
+    <button class="btn-dark" id="btnPdf" type="button">Opret PDF</button>
+    <div class="hint" style="margin-top:8px">Vælg "Gem som PDF" som printer i dialogen. Skemaet kommer først, derefter ét bilag pr. side.</div>
+  </section>
+</main>
+
+<!-- ledger bar -->
+<div class="ledger" aria-live="polite">
+  <div class="ledger-inner">
+    <div class="sums">
+      <div><span class="label">Med bilag (DKK)</span><b id="sumMed">0,00 kr</b></div>
+      <div><span class="label">Uden bilag (DKK)</span><b id="sumUden">0,00 kr</b></div>
+      <div><span class="label">I alt (DKK)</span><b id="sumIalt">0,00 kr</b></div>
+      <div id="firmWrap" style="display:none"><span class="label">Firmabetalt (fratrækkes)</span><b id="sumFirm">0,00 kr</b></div>
+    </div>
+    <div class="sums payout"><div><span class="label">Overføres</span><b id="sumUd">0,00 kr</b></div></div>
+  </div>
+</div>
+
+<div id="printArea" aria-hidden="true"></div>
+
+<script>
+"use strict";
+const CATEGORIES = ["Forplejning","Transport","Ophold","Repræsentation","Brændstof","Parkering","Diverse"];
+const CUR_SUGGESTIONS = ["DKK","EUR","USD","GBP","SEK","NOK","CHF","PLN","THB","JPY"];
+function normCur(x){
+  let s = String(x??"").trim().toUpperCase();
+  if(!s) return "DKK";
+  if(/^(€|EURO?)$/.test(s)) return "EUR";
+  if(/^(\$|DOLLARS?|USD)$/.test(s)) return "USD";
+  if(/^(£|PUND|POUND|GBP)$/.test(s)) return "GBP";
+  if(/^(KR\.?|DKK|DKR)$/.test(s)) return "DKK";
+  s = s.replace(/[^A-Z]/g,"");
+  return s || "DKK";
+}
+function todayIso(){ return new Date().toISOString().slice(0,10); }
+/* Henter ECB-referencekurs (via frankfurter.dev, gratis/uden nøgle) for valuta -> DKK
+   på en given dato. Weekend/helligdag: API'et bruger selv seneste bankdag. */
+async function fetchRate(cur, dateIso){
+  cur = normCur(cur);
+  if(cur==="DKK") return null;
+  const d = (dateIso && /^\d{4}-\d{2}-\d{2}$/.test(dateIso) && dateIso <= todayIso()) ? dateIso : "latest";
+  const res = await fetch(`https://api.frankfurter.dev/v1/${d}?base=${encodeURIComponent(cur)}&symbols=DKK`);
+  if(!res.ok) throw new Error("HTTP "+res.status);
+  const j = await res.json();
+  const rate = j && j.rates && j.rates.DKK;
+  return rate ? {rate, date: j.date||d} : null;
+}
+function maybeFetchRate(line, rerender, force){
+  const cur = normCur(line.currency);
+  if(cur==="DKK") return;
+  if(!force && (parseRate(line.rate)>0 || !isNaN(parseAmount(line.dkk)))) return;
+  if(line._fetching) return;
+  line._fetching = true;
+  line.rateNote = "Henter dagskurs…";
+  rerender();
+  fetchRate(cur, line.date).then(res=>{
+    line._fetching = false;
+    if(res && res.rate>0){
+      line.rate = res.rate.toFixed(4).replace(".",",");
+      line.rateNote = `ECB-referencekurs pr. ${fmtDate(res.date)} — kan rettes, eller overskriv med faktisk DKK-beløb.`;
+    } else {
+      line.rateNote = `Kursen for ${cur} kunne ikke hentes — indtast manuelt.`;
+    }
+    rerender();
+  }).catch(()=>{
+    line._fetching = false;
+    line.rateNote = `Kursen for ${cur} kunne ikke hentes (offline eller ukendt valutakode) — indtast manuelt.`;
+    rerender();
+  });
+}
+const state = { receipts: [], uden: [] };
+// receipt: {id,fileName,dataUrl,category,merchant,date,amount(str, i valgt valuta),currency,rate(str, kurs til DKK),dkk(str, brugerens overskrivning),origNote}
+let seq = 0;
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+function parseAmount(v){
+  if(v==null) return NaN;
+  let s = String(v).trim().replace(/\s|kr\.?|DKK|€|EUR|USD|GBP|SEK|NOK|CHF|PLN|THB|JPY/gi,"");
+  if(!s) return NaN;
+  if(s.includes(",")){ s = s.replace(/\./g,"").replace(",","."); }
+  const n = parseFloat(s);
+  return isNaN(n)?NaN:n;
+}
+function parseRate(v){
+  if(v==null) return NaN;
+  let s = String(v).trim();
+  if(!s) return NaN;
+  if(s.includes(",")){ s = s.replace(/\./g,"").replace(",","."); }
+  const n = parseFloat(s);
+  return isNaN(n)?NaN:n;
+}
+function fmt(n){ return (isNaN(n)?0:n).toLocaleString("da-DK",{minimumFractionDigits:2,maximumFractionDigits:2})+" kr"; }
+function fmtRate(n){ return (isNaN(n)?0:n).toLocaleString("da-DK",{minimumFractionDigits:4,maximumFractionDigits:6}); }
+// beregnet DKK for en linje: brugerens override vinder, ellers amount*rate (rate=1 for DKK)
+function dkkOf(x){
+  const manual = parseAmount(x.dkk);
+  if(!isNaN(manual)) return manual;
+  const amt = parseAmount(x.amount);
+  if(isNaN(amt)) return 0;
+  const cur = (x.currency||"DKK").toUpperCase();
+  if(cur==="DKK") return amt;
+  const rate = parseRate(x.rate);
+  if(isNaN(rate)||rate<=0) return 0;
+  return amt * rate;
+}
+function fmtDate(iso){
+  if(!iso) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : iso;
+}
+function esc(s){ return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function normName(s){ return String(s??"").toLowerCase().replace(/\.[a-z0-9]+$/,"").replace(/[^a-z0-9æøå]/g,""); }
+
+/* ---------- totals ---------- */
+function totals(){
+  const med = state.receipts.reduce((a,r)=>a+dkkOf(r),0);
+  const uden = state.uden.reduce((a,u)=>a+dkkOf(u),0);
+  const firm = state.receipts.reduce((a,r)=>a+(r.firm?dkkOf(r):0),0);
+  const over = med + uden - firm;
+  $("sumMed").textContent = fmt(med);
+  $("sumUden").textContent = fmt(uden);
+  $("sumIalt").textContent = fmt(med+uden);
+  $("sumFirm").textContent = "− "+fmt(firm);
+  $("firmWrap").style.display = firm>0 ? "" : "none";
+  $("sumUd").textContent = fmt(over);
+  return {med,uden,ialt:med+uden,firm,over};
+}
+
+/* ---------- dage ---------- */
+function calcDays(){
+  const a = $("fAfrejse").value, b = $("fHjemkomst").value;
+  if(a&&b){
+    const d = Math.round((new Date(b)-new Date(a))/86400000)+1;
+    $("fDage").value = d>0 ? d : "";
+  } else $("fDage").value = "";
+}
+$("fAfrejse").addEventListener("change",calcDays);
+$("fHjemkomst").addEventListener("change",calcDays);
+
+/* ---------- upload ---------- */
+const dz = $("dropzone"), fi = $("fileInput");
+dz.addEventListener("click",()=>fi.click());
+dz.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();fi.click();} });
+["dragover","dragenter"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("drag");}));
+["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("drag");}));
+dz.addEventListener("drop",e=>addFiles(e.dataTransfer.files));
+fi.addEventListener("change",()=>{ addFiles(fi.files); fi.value=""; });
+
+function addFiles(files){
+  [...files].forEach(f=>{
+    if(!/^image\//.test(f.type)){ flash("fillFlash",`"${f.name}" er ikke et billede og blev sprunget over. Brug JPG/PNG.`,"warn"); return; }
+    const rd = new FileReader();
+    rd.onload = ()=> {
+      state.receipts.push({id:++seq,fileName:f.name,dataUrl:rd.result,category:"",merchant:"",date:"",amount:"",currency:"DKK",rate:"",dkk:"",origNote:"",firm:false});
+      renderReceipts();
+    };
+    rd.readAsDataURL(f);
+  });
+}
+
+/* ---------- receipt cards ---------- */
+function renderReceipts(){
+  const host = $("receiptList");
+  host.innerHTML = "";
+  state.receipts.forEach(r=>{
+    const el = document.createElement("div");
+    el.className = "receipt";
+    const cur = (r.currency||"DKK").toUpperCase();
+    const isDkk = cur==="DKK";
+    const computedDkk = dkkOf(r);
+    const hasManual = !isNaN(parseAmount(r.dkk));
+    const showFxHint = !isDkk;
+    el.innerHTML = `
+      <div class="thumbwrap">${r.dataUrl?`<img src="${r.dataUrl}" alt="Kvittering ${esc(r.fileName)}">`:`<div class="noimg">Ingen billedfil<br>(linje fra Copilot)</div>`}</div>
+      <div class="fields">
+        <div class="fname">${esc(r.fileName||"—")}${r.firm?`<span class="firm-badge">Firmabetalt · udbetales ikke</span>`:""}</div>
+        ${r.origNote?`<div class="orig">${esc(r.origNote)}</div>`:""}
+        <div class="frow frow1">
+          <div><label>Kategori</label>
+            <select data-k="category">${["<option value=''>Vælg…</option>",...CATEGORIES.map(c=>`<option${r.category===c?" selected":""}>${c}</option>`)].join("")}</select>
+          </div>
+          <div><label>Forhandler</label><input type="text" data-k="merchant" value="${esc(r.merchant)}"></div>
+          <div><label>Dato</label><input type="date" data-k="date" value="${esc(r.date)}"></div>
+          <div><label>Firmabetalt</label>
+            <label class="chkline" title="Markér hvis beløbet ikke skal udbetales til dig — fx betalt med tjeneste-/firmakort. Bilaget medtages stadig som dokumentation.">
+              <input type="checkbox" data-k="firm"${r.firm?" checked":""}><span>udbetales ikke</span>
+            </label>
+          </div>
+        </div>
+        <div class="frow frow2">
+          <div><label>Beløb</label><input type="text" data-k="amount" inputmode="decimal" placeholder="0,00" value="${esc(r.amount)}"></div>
+          <div><label>Valuta</label>
+            <input type="text" data-k="currency" list="curList" autocomplete="off" spellcheck="false" style="text-transform:uppercase" placeholder="DKK" value="${esc(cur)}">
+          </div>
+          <div><label>Dagskurs</label>
+            <div class="ratewrap">
+              <input type="text" data-k="rate" inputmode="decimal" placeholder="${isDkk?"–":"fx 7,4560"}" value="${esc(r.rate)}"${isDkk?" disabled":""}>
+              ${isDkk?"":`<button class="btn-rate" type="button" title="Hent ECB-dagskurs for kvitteringens dato"${r._fetching?" disabled":""}>Hent</button>`}
+            </div>
+          </div>
+          <div><label>DKK-beløb${hasManual?" ✎":""}</label><input type="text" data-k="dkk" inputmode="decimal" placeholder="${fmt(computedDkk).replace(" kr","")}" value="${esc(r.dkk)}"></div>
+          <div class="cell-del"><button class="btn-danger" type="button" aria-label="Fjern kvittering">Fjern</button></div>
+        </div>
+        ${r.rateNote?`<div class="ratenote">${esc(r.rateNote)}</div>`:""}
+        ${showFxHint?`<div class="fx-hint"><b>Tip:</b> I stedet for dagskurs kan du med fordel indtaste det <b>faktiske DKK-beløb trukket fra din konto</b> direkte i DKK-feltet — det inkluderer bankens valutatillæg, som dagskursen ikke fanger.</div>`:""}
+      </div>`;
+    el.querySelectorAll("[data-k]").forEach(inp=>{
+      const isChk = inp.type==="checkbox";
+      const handler = ()=>{
+        let v = isChk ? inp.checked : inp.value;
+        if(inp.dataset.k==="currency"){
+          v = normCur(v);
+          if(v!==normCur(r.currency)){ r.rate=""; r.rateNote=""; } // ny valuta -> gammel kurs duer ikke
+        }
+        r[inp.dataset.k]=v;
+        renderReceipts();
+        if(["currency","date","amount"].includes(inp.dataset.k)) maybeFetchRate(r, renderReceipts);
+      };
+      inp.addEventListener("input",()=>{ r[inp.dataset.k]= isChk ? inp.checked : inp.value; totals(); });
+      inp.addEventListener("change",handler);
+    });
+    const rateBtn = el.querySelector(".btn-rate");
+    if(rateBtn) rateBtn.addEventListener("click",()=>{ r.rate=""; maybeFetchRate(r, renderReceipts, true); });
+    el.querySelector(".btn-danger").addEventListener("click",()=>{
+      state.receipts = state.receipts.filter(x=>x.id!==r.id);
+      renderReceipts();
+    });
+    host.appendChild(el);
+  });
+  totals();
+}
+
+/* ---------- uden bilag ---------- */
+function renderUb(){
+  const host = $("ubList");
+  host.innerHTML = "";
+  state.uden.forEach(u=>{
+    const row = document.createElement("div");
+    row.className = "ub-row";
+    const cur = (u.currency||"DKK").toUpperCase();
+    const isDkk = cur==="DKK";
+    const computedDkk = dkkOf(u);
+    row.innerHTML = `
+      <div><label>Beskrivelse</label><input type="text" data-k="desc" value="${esc(u.desc)}"></div>
+      <div class="frow frow2">
+        <div><label>Beløb</label><input type="text" data-k="amount" inputmode="decimal" placeholder="0,00" value="${esc(u.amount)}"></div>
+        <div><label>Valuta</label>
+          <input type="text" data-k="currency" list="curList" autocomplete="off" spellcheck="false" style="text-transform:uppercase" placeholder="DKK" value="${esc(cur)}">
+        </div>
+        <div><label>Dagskurs</label>
+          <div class="ratewrap">
+            <input type="text" data-k="rate" inputmode="decimal" placeholder="${isDkk?"–":"fx 7,4560"}" value="${esc(u.rate)}"${isDkk?" disabled":""}>
+            ${isDkk?"":`<button class="btn-rate" type="button" title="Hent ECB-dagskurs"${u._fetching?" disabled":""}>Hent</button>`}
+          </div>
+        </div>
+        <div><label>DKK-beløb</label><input type="text" data-k="dkk" inputmode="decimal" placeholder="${fmt(computedDkk).replace(" kr","")}" value="${esc(u.dkk)}"></div>
+        <div class="cell-del"><button class="btn-danger" type="button">Fjern</button></div>
+      </div>
+      ${u.rateNote?`<div class="ratenote">${esc(u.rateNote)}</div>`:""}`;
+    row.querySelectorAll("[data-k]").forEach(inp=>{
+      inp.addEventListener("input",()=>{ u[inp.dataset.k]=inp.value; totals(); });
+      inp.addEventListener("change",()=>{
+        let v = inp.value;
+        if(inp.dataset.k==="currency"){
+          v = normCur(v);
+          if(v!==normCur(u.currency)){ u.rate=""; u.rateNote=""; }
+        }
+        u[inp.dataset.k]=v;
+        renderUb();
+        if(["currency","amount"].includes(inp.dataset.k)) maybeFetchRate(u, renderUb);
+      });
+    });
+    const ubRateBtn = row.querySelector(".btn-rate");
+    if(ubRateBtn) ubRateBtn.addEventListener("click",()=>{ u.rate=""; maybeFetchRate(u, renderUb, true); });
+    row.querySelector(".btn-danger").addEventListener("click",()=>{
+      state.uden = state.uden.filter(x=>x!==u); renderUb();
+    });
+    host.appendChild(row);
+  });
+  totals();
+}
+$("btnAddUb").addEventListener("click",()=>{ state.uden.push({desc:"",amount:"",currency:"DKK",rate:"",dkk:""}); renderUb(); });
+
+/* ---------- copilot ---------- */
+const COPILOT_PROMPT =
+`Du får vedhæftet billeder af kvitteringer fra en tjenesterejse.
+Aflæs hver kvittering og returnér KUN et JSON-array — ingen anden tekst, ingen forklaring. Returnér JSON'en inde i en \`\`\`json kodeblok.
+Formatet for hvert element:
+{"fileName":"<billedets filnavn, hvis du kender det, ellers tom streng>","merchant":"<forretningens navn>","date":"<dato som YYYY-MM-DD>","amount":<totalbeløbet som tal med punktum som decimaltegn>,"currency":"<valutakode, fx DKK, EUR, USD, GBP, SEK, NOK, THB>","category":"<præcis én af: Forplejning, Transport, Ophold, Repræsentation, Brændstof, Parkering, Diverse>","rate":<kun for udenlandsk valuta: søg på nettet efter valutakursen til DKK (Nationalbanken eller ECB) på kvitteringens dato og angiv kursen som tal (DKK pr. 1 enhed af valutaen), ellers null>}
+Regler: Brug kvitteringens samlede totalbeløb i den valuta, der står på kvitteringen. Omregn ikke beløbet. Er du usikker på kursen, så sæt rate til null i stedet for at gætte. Er noget ulæseligt, brug tom streng eller null.`;
+function sanitizeJson(s){
+  return s
+    .replace(/[\u2018\u2019\u201A\u2032]/g,"'")
+    .replace(/[\u201C\u201D\u201E\u2033]/g,'"')
+    .replace(/[\u2010\u2011\u2012\u2013\u2014\u2212]/g,"-")
+    .replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g," ")
+    .replace(/,\s*([}\]])/g,"$1");
+}
+
+$("btnCopyPrompt").addEventListener("click",async ()=>{
+  try{ await navigator.clipboard.writeText(COPILOT_PROMPT); flash("fillFlash","Prompten er kopieret. Åbn Copilot, vedhæft billederne og sæt den ind.","ok"); }
+  catch(e){
+    const ta=document.createElement("textarea"); ta.value=COPILOT_PROMPT; document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); ta.remove();
+    flash("fillFlash","Prompten er kopieret.","ok");
+  }
+});
+
+$("btnFill").addEventListener("click",()=>{
+  let raw = $("copilotJson").value.trim();
+  if(!raw){ flash("fillFlash","Sæt Copilots JSON-svar ind i feltet først.","err"); return; }
+  raw = raw.replace(/```json|```/g,"").trim();
+  raw = sanitizeJson(raw);
+  const s = raw.indexOf("["), e = raw.lastIndexOf("]");
+  if(s>-1 && e>s) raw = raw.slice(s,e+1);
+  let arr;
+  try{ arr = JSON.parse(raw); }
+  catch(err){
+    flash("fillFlash","Kunne ikke læse svaret som JSON: "+err.message+". Tjek at hele arrayet er med.","err");
+    return;
+  }
+  if(!Array.isArray(arr)) arr=[arr];
+  let matched=0, created=0, fxCount=0;
+  arr.forEach(item=>{
+    if(!item||typeof item!=="object") return;
+    const cat = CATEGORIES.find(c=>c.toLowerCase()===String(item.category||"").trim().toLowerCase())||"";
+    const cur = normCur(item.currency);
+    const amtNum = parseAmount(item.amount);
+    const jsonRate = parseRate(item.rate);
+    const fill = r=>{
+      if(cat) r.category=cat;
+      if(item.merchant) r.merchant=String(item.merchant);
+      if(item.date && /^\d{4}-\d{2}-\d{2}/.test(String(item.date))) r.date=String(item.date).slice(0,10);
+      if(!isNaN(amtNum)){
+        r.amount = amtNum.toFixed(2).replace(".",",");
+        r.currency = cur;
+        r.rate = "";
+        r.dkk = "";
+        r.rateNote = "";
+        if(cur!=="DKK"){
+          fxCount++;
+          if(!isNaN(jsonRate) && jsonRate>0){
+            r.rate = jsonRate.toFixed(4).replace(".",",");
+            r.rateNote = "Kurs fra Copilot — kontrollér den, eller tryk Hent for ECB-kursen.";
+          }
+          r.origNote = `Aflæst i ${cur} — kursen hentes/kontrolleres, eller indtast det faktiske DKK-beløb fra kontoudtoget.`;
+        } else {
+          r.origNote = "";
+        }
+      }
+    };
+    const key = normName(item.fileName);
+    let target = key ? state.receipts.find(r=>{
+      const rn = normName(r.fileName);
+      return rn && (rn===key || rn.includes(key) || key.includes(rn));
+    }) : null;
+    if(!target) target = state.receipts.find(r=>r.dataUrl && !r.merchant && !r.amount && !r.category);
+    if(target){ fill(target); matched++; }
+    else{
+      const r={id:++seq,fileName:item.fileName||"",dataUrl:"",category:"",merchant:"",date:"",amount:"",currency:"DKK",rate:"",dkk:"",origNote:"",firm:false};
+      fill(r); state.receipts.push(r); created++;
+    }
+  });
+  renderReceipts();
+  // Hent ECB-kurs automatisk for udenlandske linjer uden kurs
+  state.receipts.forEach(r=>{ if(normCur(r.currency)!=="DKK") maybeFetchRate(r, renderReceipts); });
+  const parts=[];
+  if(matched) parts.push(`${matched} kvittering${matched>1?"er":""} udfyldt`);
+  if(created) parts.push(`${created} linje${created>1?"r":""} oprettet uden billede`);
+  if(fxCount) parts.push(`${fxCount} i udenlandsk valuta – dagskurs hentes automatisk (kan rettes)`);
+  flash("fillFlash", parts.length?`${parts.join(" · ")}.`:"Ingen brugbare linjer fundet i svaret.", parts.length?"ok":"warn");
+});
+
+function flash(id,msg,cls){ const el=$(id); el.textContent=msg; el.className="flash "+(cls||""); }
+
+/* ---------- print / PDF ---------- */
+$("btnPdf").addEventListener("click",()=>{
+  const t = totals();
+  const g = id=>esc($(id).value);
+  // Grupper med-bilag pr. kategori (reducerer antal linjer i skemaet)
+  const groups = {};
+  state.receipts.forEach(r=>{
+    const cat = r.category || "Uden kategori";
+    if(!groups[cat]) groups[cat] = {count:0, sum:0, items:[]};
+    groups[cat].count++;
+    groups[cat].sum += dkkOf(r);
+    groups[cat].items.push(r);
+  });
+  const catOrder = [...CATEGORIES, "Uden kategori"];
+  const rows = catOrder
+    .filter(c=>groups[c])
+    .map(c=>{
+      const g = groups[c];
+      // liste af forhandlere som lille undertekst
+      const merchants = [...new Set(g.items.map(i=>(i.merchant||"")+(i.firm?" (firmabetalt)":"")).filter(s=>s&&s!==" (firmabetalt)"))].join(", ");
+      return `
+        <tr><td><b>${esc(c)}</b>${merchants?`<br><span style="font-size:9.5pt;color:#555">${esc(merchants)}</span>`:""}</td>
+            <td class="num">${g.count}</td>
+            <td class="num">${fmt(g.sum)}</td></tr>`;
+    }).join("");
+  const ubRows = state.uden.filter(u=>u.desc||u.amount).map(u=>`
+    <tr><td>${esc(u.desc)}</td><td class="num"></td><td class="num">${fmt(dkkOf(u))}</td></tr>`).join("");
+  const bilag = state.receipts.filter(r=>r.dataUrl).map((r,i)=>{
+    const dkkAmt = dkkOf(r);
+    const cur = (r.currency||"DKK").toUpperCase();
+    const origAmt = parseAmount(r.amount);
+    const rateNum = parseRate(r.rate);
+    let amtLine = "";
+    if(!isNaN(dkkAmt)) amtLine = fmt(dkkAmt);
+    if(cur!=="DKK" && !isNaN(origAmt)){
+      amtLine += ` (${origAmt.toFixed(2).replace(".",",")} ${cur}${!isNaN(rateNum)?` à ${fmtRate(rateNum)}`:""})`;
+    }
+    return `
+    <div class="p-bilag">
+      <h3>Bilag ${i+1} · ${esc(r.category||"")}${r.category?" · ":""}${esc(r.merchant||r.fileName||"")}${r.date?" · "+fmtDate(r.date):""}${amtLine?" · "+amtLine:""}${r.firm?" · FIRMABETALT — udbetales ikke":""}</h3>
+      <img src="${r.dataUrl}" alt="Bilag ${i+1}">
+    </div>`;
+  }).join("");
+
+  $("printArea").innerHTML = `
+    <div class="p-doc">
+      <div class="p-head"><div class="p-org">Danske Maritime</div><h1>REJSEAFREGNING</h1></div>
+      <table class="p-meta">
+        <tr><td class="k">Navn</td><td>${g("fNavn")}</td><td class="k">Konto</td><td>${g("fKonto")}</td></tr>
+        <tr><td class="k">Projekt</td><td>${g("fProjekt")}</td><td class="k">Reg. nr.</td><td>${g("fReg")}</td></tr>
+        <tr><td class="k">Sted</td><td>${g("fSted")}</td><td class="k">Afrejse</td><td>${fmtDate($("fAfrejse").value)}</td></tr>
+        <tr><td class="k">Formål</td><td>${g("fFormaal")}</td><td class="k">Hjemkomst</td><td>${fmtDate($("fHjemkomst").value)}</td></tr>
+        <tr><td class="k"></td><td></td><td class="k">I alt dage</td><td>${g("fDage")}</td></tr>
+      </table>
+
+      <table class="p-exp">
+        <tr><th>Udlæg med bilag (samlet pr. kategori)</th><th class="num" style="width:15%">Antal</th><th class="num" style="width:20%">DKK</th></tr>
+        ${rows||`<tr><td colspan="3" style="color:#666">Ingen</td></tr>`}
+        <tr class="p-total"><td>I alt med bilag</td><td class="num">${state.receipts.length}</td><td class="num">${fmt(t.med)}</td></tr>
+      </table>
+
+      <table class="p-exp">
+        <tr><th>Udlæg uden bilag</th><th class="num" style="width:15%"></th><th class="num" style="width:20%">DKK</th></tr>
+        ${ubRows||`<tr><td colspan="3" style="color:#666">Ingen</td></tr>`}
+        <tr class="p-total"><td colspan="2">I alt uden bilag</td><td class="num">${fmt(t.uden)}</td></tr>
+      </table>
+
+      <table class="p-exp">
+        <tr class="p-total"><td>I alt</td><td class="num" style="width:20%">${fmt(t.ialt)}</td></tr>
+        ${t.firm>0?`<tr><td>Heraf firmabetalt — udbetales ikke</td><td class="num">− ${fmt(t.firm)}</td></tr>`:""}
+      </table>
+      <div class="p-payout"><span>Udbetales / Overføres</span><span>${fmt(t.over)}</span></div>
+      ${t.firm>0?`<div class="p-note">Bilag markeret "Firmabetalt" (fx betalt med tjeneste-/firmakort) indgår som dokumentation, men beløbet udbetales ikke.</div>`:""}
+      <div class="p-note">Beløb i udenlandsk valuta er omregnet til DKK via dagskurs (ECB-referencekurs på kvitteringens dato) eller faktisk kontotræk (se bilag for detaljer).</div>
+
+      ${$("fBem").value?`<div class="p-note"><b>Bemærkninger:</b> ${g("fBem").replace(/\n/g,"<br>")}</div>`:""}
+
+      <div class="p-sign"><div>Dato</div><div>Underskrift</div></div>
+      <div class="p-note">Alle bilag er vedhæftet på de følgende sider.</div>
+    </div>
+    ${bilag}`;
+  window.print();
+});
+
+/* ---------- husk personoplysninger mellem sessioner ---------- */
+const REMEMBER_KEY = "danskemaritime.rejseafregning.person.v1";
+const REMEMBER_FIELDS = ["fNavn","fKonto","fReg"];
+function loadRemembered(){
+  try{
+    const raw = localStorage.getItem(REMEMBER_KEY);
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    let n = 0;
+    REMEMBER_FIELDS.forEach(id=>{
+      if(data && typeof data[id] === "string" && data[id]){
+        $(id).value = data[id]; n++;
+      }
+    });
+    if(n) flash("rememberFlash", `Udfyldt fra sidste gang (${n} felt${n>1?"er":""}). Ret hvis nødvendigt.`, "ok");
+  }catch(e){}
+}
+function saveRemembered(){
+  try{
+    const data = {};
+    REMEMBER_FIELDS.forEach(id => data[id] = $(id).value || "");
+    if(Object.values(data).some(v=>v.trim())){
+      localStorage.setItem(REMEMBER_KEY, JSON.stringify(data));
+    }
+  }catch(e){}
+}
+REMEMBER_FIELDS.forEach(id=>{
+  const el = $(id);
+  el.addEventListener("change", saveRemembered);
+  el.addEventListener("blur", saveRemembered);
+});
+$("btnClearRemember").addEventListener("click",()=>{
+  try{ localStorage.removeItem(REMEMBER_KEY); }catch(e){}
+  REMEMBER_FIELDS.forEach(id=>{ $(id).value = ""; });
+  flash("rememberFlash","Gemte oplysninger er slettet.","warn");
+});
+
+/* init */
+renderUb(); totals(); loadRemembered();
+</script>
+</body>
+</html>
