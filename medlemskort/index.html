@@ -4,127 +4,143 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Afdelingskort</title>
-
-<!-- Leaflet (kortbibliotek) og markercluster (samler pins i klynger) -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css">
-
 <style>
   html, body { height: 100%; margin: 0; }
   body { display: flex; flex-direction: column;
          font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
-
   .top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
          padding: 8px 10px; border-bottom: 1px solid #e3e3e3; background: #fafafa; }
   .top select, .top input {
          padding: 6px 8px; border: 1px solid #c9c9c9; border-radius: 6px;
          font-size: 13px; background: #fff; }
-  .top input { min-width: 180px; }
+  .top input[type=text] { min-width: 170px; }
   .top button { padding: 6px 12px; border: 1px solid #c9c9c9; border-radius: 6px;
          background: #fff; font-size: 13px; cursor: pointer; }
   .top button:hover { background: #f0f0f0; }
   #taeller { font-size: 12.5px; color: #555; margin-left: auto; }
-
   #kort { flex: 1; min-height: 260px; }
-
   .besked { padding: 14px 16px; font-size: 14px; background: #fff7e6;
             color: #7a4b00; border-bottom: 1px solid #f0dcb4; }
   .besked.fejl { background: #fdecec; color: #8a1f1f; border-color: #f2c4c4; }
-
   .bund { padding: 6px 10px; font-size: 12px; color: #666;
           border-top: 1px solid #e3e3e3; background: #fafafa; }
-
   .pop { font-size: 13px; line-height: 1.45; max-width: 240px; }
   .pop-navn  { font-weight: 600; margin-bottom: 2px; }
   .pop-brand { color: #666; font-size: 12px; margin-bottom: 4px; }
+  .pop-hk { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 10px;
+            background: #e9f7ec; color: #1c6b2c; border: 1px solid #bfe0c6; margin-bottom: 6px; }
   .pop-adr   { margin-bottom: 6px; }
+  .pop-bekraeft { font-size: 12px; color: #1c6b2c; margin-bottom: 6px; }
+  .pop-bekraeft.foraeldet { color: #c0392b; font-weight: 600; }
   .pop-links a { color: #1a56a0; text-decoration: none; }
   .pop-links a:hover { text-decoration: underline; }
+  /* multi-select */
+  .ms { position: relative; }
+  .ms > summary { list-style: none; cursor: pointer; padding: 6px 10px;
+         border: 1px solid #c9c9c9; border-radius: 6px; background: #fff; font-size: 13px; user-select: none; }
+  .ms > summary::-webkit-details-marker { display: none; }
+  .ms > summary::after { content: " ▾"; color: #888; }
+  .ms-panel { position: absolute; z-index: 1200; top: 112%; left: 0; background: #fff;
+         border: 1px solid #c9c9c9; border-radius: 8px; padding: 8px 10px;
+         box-shadow: 0 4px 14px rgba(0,0,0,.12); min-width: 200px; }
+  .ms-panel label { display: flex; align-items: center; gap: 6px; font-size: 13px;
+         padding: 3px 0; white-space: nowrap; cursor: pointer; }
 </style>
 </head>
 <body>
-
 <div class="top" id="filterbar" hidden>
   <select id="fLand"><option value="">Alle lande</option></select>
   <select id="fBrand"><option value="">Alle virksomheder</option></select>
+  <details class="ms" id="msMedlemstype">
+    <summary id="msSummary">Medlemstype: alle</summary>
+    <div class="ms-panel" id="msPanel"></div>
+  </details>
   <input id="fSoeg" type="text" placeholder="Søg afdeling, by eller adresse …">
+  <label style="font-size:12.5px;color:#555;display:flex;align-items:center;gap:5px;">
+    <input type="checkbox" id="fForael"> Kun forældede
+  </label>
   <button id="fNulstil" type="button">Nulstil</button>
   <span id="taeller"></span>
 </div>
-
 <div class="besked" id="besked" hidden></div>
 <div id="kort"></div>
 <div class="bund" id="bund" hidden></div>
-
-<!-- Zoho's SDK skal indlæses FØR vores egen kode -->
 <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
-
 <script id="hovedscript">
 "use strict";
-
 /* =====================================================================
-   KONFIGURATION
-   Skal matche API-navnene i jeres CRM (tjekkes ved Checkpoint 1).
-   Passer navnene ikke, er det KUN her, der skal rettes.
+   KONFIGURATION — skal matche API-navnene i CRM. Ret KUN her.
    ===================================================================== */
 const CONFIG = {
   modul: "Afdelinger",
   felter: {
-    navn:    "Name",
-    medlem:  "Medlem",
-    brand:   "Brand",
-    land:    "Land",
-    adresse: "Adresse",
-    postnr:  "Postnummer",
-    by:      "By",
-    website: "Website",
-    lat:     "Latitude",
-    lon:     "Longitude"
+    navn:         "Name",
+    medlem:       "Medlem",
+    brand:        "Brand",
+    land:         "Land",
+    adresse:      "Adresse",
+    postnr:       "Postnummer",
+    by:           "By",
+    website:      "Website",
+    lat:          "Latitude",
+    lon:          "Longitude",
+    bekraeftet:   "Sidst_bekraeftet",
+    afdelingstype:"Afdelingstype"
   },
-  // Ved brand-genkendelse ud fra kontonavn: ignorer meget korte brands
-  minBrandLaengde: 3
+  minBrandLaengde: 3,
+  bekraeftGraenseDage: 365,
+  hovedkontorType: "Dansk hovedkontor",
+  konto: {
+    navnFelt:        "Account_Name",
+    medlemstypeFelt: "Medlemstype",
+    alleMedlemstyper: ["DI - Ordinær", "Associeret", "Iværksættermedlem", "Støttemedlem"]
+  }
 };
-
 /* ===================================================================== */
-
 let kort, cluster;
 let alleRecords = [];
+let kontoMap = {};   // id -> { navn, type }
 const tilstand = { mode: "global", kontoId: null, kontoNavn: "", brands: [] };
 let startTimeout = null;
-
 function $(id) { return document.getElementById(id); }
-
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
   });
 }
-
 function F(rec, noegle) { return rec[CONFIG.felter[noegle]]; }
-
 function visBesked(tekst, erFejl) {
-  const b = $("besked");
-  b.textContent = tekst;
-  b.classList.toggle("fejl", !!erFejl);
-  b.hidden = false;
+  const b = $("besked"); b.textContent = tekst; b.classList.toggle("fejl", !!erFejl); b.hidden = false;
 }
-
 function skjulBesked() { $("besked").hidden = true; }
-
 function visFejl(fejl) {
   console.error("Afdelingskort-fejl:", fejl);
-  visBesked(
-    "Kortet kunne ikke hente data. Tryk F12, åbn fanen Console, " +
-    "kopiér den røde fejltekst og send den i chatten – så finder vi fejlen sammen.",
-    true
-  );
+  visBesked("Kortet kunne ikke hente data. Tryk F12, åbn fanen Console, kopiér den røde "
+    + "fejltekst og send den i chatten – så finder vi fejlen sammen.", true);
 }
-
+function medlemstypeForAfd(r) {
+  const m = F(r, "medlem");
+  if (!m || !m.id) return null;
+  const k = kontoMap[String(m.id)];
+  return k ? k.type : null;
+}
+/* ---------- bekræftelses-status ---------- */
+function toCifre(n) { return (n < 10 ? "0" : "") + n; }
+function datoISO(d) { return d.getFullYear() + "-" + toCifre(d.getMonth() + 1) + "-" + toCifre(d.getDate()); }
+function bekraeftStatus(rec) {
+  const raa = F(rec, "bekraeftet");
+  if (!raa) return { harDato: false, foraeldet: true, tekst: "aldrig bekræftet" };
+  const d = new Date(raa);
+  if (isNaN(d.getTime())) return { harDato: false, foraeldet: true, tekst: String(raa) };
+  const alderDage = (Date.now() - d.getTime()) / 86400000;
+  return { harDato: true, foraeldet: alderDage > CONFIG.bekraeftGraenseDage, tekst: datoISO(d) };
+}
 /* ---------- kort ---------- */
-
 function initKort() {
   kort = L.map("kort", { worldCopyJump: true }).setView([25, 10], 2);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -134,81 +150,61 @@ function initKort() {
   cluster = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45 });
   kort.addLayer(cluster);
 }
-
 function popupHtml(r) {
   const navn  = esc(F(r, "navn"));
   const brand = esc(F(r, "brand"));
+  const type  = F(r, "afdelingstype");
+  const hk = (type === CONFIG.hovedkontorType) ? '<div class="pop-hk">🏢 ' + esc(type) + "</div>" : "";
   const dele  = [];
   const adr   = esc(F(r, "adresse"));
   const linje2 = [esc(F(r, "postnr")), esc(F(r, "by"))].filter(Boolean).join(" ");
   const land  = esc(F(r, "land"));
-  if (adr)    dele.push(adr);
-  if (linje2) dele.push(linje2);
-  if (land)   dele.push(land);
-
+  if (adr) dele.push(adr); if (linje2) dele.push(linje2); if (land) dele.push(land);
+  const b = bekraeftStatus(r);
+  const bekraeftTekst = b.harDato
+    ? ("Sidst bekræftet: " + b.tekst + (b.foraeldet ? " ⚠ (bør tjekkes)" : ""))
+    : "⚠ Ikke bekræftet endnu";
+  const bekraeftHtml = '<div class="pop-bekraeft' + (b.foraeldet ? " foraeldet" : "") + '">' + esc(bekraeftTekst) + "</div>";
   const links = [];
   const web = F(r, "website");
   if (web) links.push('<a href="' + esc(web) + '" target="_blank" rel="noopener">Hjemmeside</a>');
   links.push('<a href="#" onclick="return aabn(\'' + esc(r.id) + '\')">Åbn i CRM</a>');
-
   return '<div class="pop">'
        + '<div class="pop-navn">' + navn + "</div>"
        + (brand && brand !== navn ? '<div class="pop-brand">' + brand + "</div>" : "")
+       + hk
        + (dele.length ? '<div class="pop-adr">' + dele.join("<br>") + "</div>" : "")
-       + '<div class="pop-links">' + links.join(" &middot; ") + "</div>"
-       + "</div>";
+       + bekraeftHtml
+       + '<div class="pop-links">' + links.join(" &middot; ") + "</div></div>";
 }
-
 window.aabn = function (id) {
-  try { ZOHO.CRM.UI.Record.open({ Entity: CONFIG.modul, RecordID: id }); }
-  catch (e) { console.error(e); }
+  try { ZOHO.CRM.UI.Record.open({ Entity: CONFIG.modul, RecordID: id }); } catch (e) { console.error(e); }
   return false;
 };
-
 function tegnMarkers(liste) {
   cluster.clearLayers();
   const pins = [];
   let udenKoordinater = 0;
-
   liste.forEach(function (r) {
-    const la = parseFloat(F(r, "lat"));
-    const lo = parseFloat(F(r, "lon"));
+    const la = parseFloat(F(r, "lat")), lo = parseFloat(F(r, "lon"));
     if (isNaN(la) || isNaN(lo)) { udenKoordinater++; return; }
-    const m = L.marker([la, lo]);
-    m.bindPopup(popupHtml(r));
-    pins.push(m);
+    const m = L.marker([la, lo]); m.bindPopup(popupHtml(r)); pins.push(m);
   });
-
   cluster.addLayers(pins);
-
-  if (pins.length === 1) {
-    kort.setView(pins[0].getLatLng(), 9);
-  } else if (pins.length > 1) {
-    kort.fitBounds(cluster.getBounds().pad(0.08));
-  }
-
+  if (pins.length === 1) kort.setView(pins[0].getLatLng(), 9);
+  else if (pins.length > 1) kort.fitBounds(cluster.getBounds().pad(0.08));
   const bund = $("bund");
-  if (udenKoordinater > 0) {
-    bund.textContent = udenKoordinater + " afdeling(er) uden koordinater vises ikke på kortet.";
-    bund.hidden = false;
-  } else {
-    bund.hidden = true;
-  }
+  if (udenKoordinater > 0) { bund.textContent = udenKoordinater + " afdeling(er) uden koordinater vises ikke på kortet."; bund.hidden = false; }
+  else bund.hidden = true;
   return { viste: pins.length, uden: udenKoordinater };
 }
-
 /* ---------- datahentning ---------- */
-
 function hentSide(side) {
-  return ZOHO.CRM.API.getAllRecords({
-    Entity: CONFIG.modul, sort_order: "asc", per_page: 200, page: side
-  });
+  return ZOHO.CRM.API.getAllRecords({ Entity: CONFIG.modul, sort_order: "asc", per_page: 200, page: side });
 }
-
 async function hentAlle() {
-  let side = 1;
-  let ud = [];
-  while (side <= 25) {                       // sikkerhedsloft: 5.000 records
+  let side = 1, ud = [];
+  while (side <= 25) {
     const svar = await hentSide(side);
     const data = (svar && svar.data) ? svar.data : [];
     ud = ud.concat(data);
@@ -217,58 +213,45 @@ async function hentAlle() {
   }
   return ud;
 }
-
+async function hentKontoMap() {
+  let side = 1, map = {};
+  while (side <= 25) {
+    const svar = await ZOHO.CRM.API.getAllRecords({ Entity: "Accounts", sort_order: "asc", per_page: 200, page: side });
+    const data = (svar && svar.data) ? svar.data : [];
+    data.forEach(function (k) {
+      map[String(k.id)] = { navn: k[CONFIG.konto.navnFelt] || "", type: k[CONFIG.konto.medlemstypeFelt] || "" };
+    });
+    if (data.length < 200) break;
+    side++;
+  }
+  return map;
+}
 /* ---------- medlemstilstand ---------- */
-
 function findBrands() {
   const fundet = new Set();
-
-  // 1) Brands fra afdelinger, der er koblet direkte til denne konto
   alleRecords.forEach(function (r) {
     const m = F(r, "medlem");
-    if (m && String(m.id) === String(tilstand.kontoId)) {
-      const b = F(r, "brand");
-      if (b) fundet.add(b);
-    }
+    if (m && String(m.id) === String(tilstand.kontoId)) { const b = F(r, "brand"); if (b) fundet.add(b); }
   });
-
-  // 2) Ellers: brands hvis navn indgår i kontonavnet
-  //    (så søsterkonti som "Everllence - PrimeServ Holeby" også viser koncernkortet)
   if (fundet.size === 0 && tilstand.kontoNavn) {
     const kontoLower = tilstand.kontoNavn.toLowerCase();
-    const alleBrands = new Set(
-      alleRecords.map(function (r) { return F(r, "brand"); }).filter(Boolean)
-    );
+    const alleBrands = new Set(alleRecords.map(function (r) { return F(r, "brand"); }).filter(Boolean));
     alleBrands.forEach(function (b) {
-      if (b.length >= CONFIG.minBrandLaengde && kontoLower.indexOf(b.toLowerCase()) !== -1) {
-        fundet.add(b);
-      }
+      if (b.length >= CONFIG.minBrandLaengde && kontoLower.indexOf(b.toLowerCase()) !== -1) fundet.add(b);
     });
   }
   return Array.from(fundet);
 }
-
 function startMedlemstilstand() {
   tilstand.brands = findBrands();
   let liste;
-
-  if (tilstand.brands.length > 0) {
-    liste = alleRecords.filter(function (r) {
-      return tilstand.brands.indexOf(F(r, "brand")) !== -1;
-    });
-  } else {
-    liste = alleRecords.filter(function (r) {
-      const m = F(r, "medlem");
-      return m && String(m.id) === String(tilstand.kontoId);
-    });
-  }
-
+  if (tilstand.brands.length > 0) liste = alleRecords.filter(function (r) { return tilstand.brands.indexOf(F(r, "brand")) !== -1; });
+  else liste = alleRecords.filter(function (r) { const m = F(r, "medlem"); return m && String(m.id) === String(tilstand.kontoId); });
   if (liste.length === 0) {
-    visBesked("Der er endnu ikke registreret afdelinger for dette medlem. " +
-              "Tilføj dem via den relaterede liste \u201EAfdelinger\u201C på kontoen.");
+    visBesked("Der er endnu ikke registreret afdelinger for dette medlem. "
+      + "Tilføj dem via den relaterede liste \u201EAfdelinger\u201C på kontoen.");
     return;
   }
-
   const res = tegnMarkers(liste);
   const bund = $("bund");
   const navnetekst = tilstand.brands.length ? tilstand.brands.join(", ") : tilstand.kontoNavn;
@@ -276,38 +259,45 @@ function startMedlemstilstand() {
                    + (res.uden ? " \u00b7 " + res.uden + " uden koordinater vises ikke" : "");
   bund.hidden = false;
 }
-
 /* ---------- global tilstand med filtre ---------- */
-
-function udfyldFiltre() {
-  const lande = Array.from(new Set(
-    alleRecords.map(function (r) { return F(r, "land"); }).filter(Boolean)
-  )).sort(function (a, b) { return a.localeCompare(b, "da"); });
-
-  const brands = Array.from(new Set(
-    alleRecords.map(function (r) { return F(r, "brand"); }).filter(Boolean)
-  )).sort(function (a, b) { return a.localeCompare(b, "da"); });
-
-  lande.forEach(function (l) {
-    const o = document.createElement("option");
-    o.value = l; o.textContent = l;
-    $("fLand").appendChild(o);
+function opsaetMedlemstypeMultiselect() {
+  const panel = $("msPanel"); panel.innerHTML = "";
+  CONFIG.konto.alleMedlemstyper.forEach(function (t) {
+    const label = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.className = "mtype"; cb.value = t; cb.checked = true;
+    cb.addEventListener("change", function () { opdaterMsSummary(); anvendFilter(); });
+    label.appendChild(cb); label.appendChild(document.createTextNode(" " + t));
+    panel.appendChild(label);
   });
-  brands.forEach(function (b) {
-    const o = document.createElement("option");
-    o.value = b; o.textContent = b;
-    $("fBrand").appendChild(o);
-  });
+  opdaterMsSummary();
 }
-
+function valgteMedlemstyper() {
+  return Array.prototype.filter.call(document.querySelectorAll(".mtype"), function (c) { return c.checked; })
+    .map(function (c) { return c.value; });
+}
+function opdaterMsSummary() {
+  const valgt = valgteMedlemstyper(), alle = CONFIG.konto.alleMedlemstyper.length;
+  $("msSummary").textContent = (valgt.length === alle) ? "Medlemstype: alle" : "Medlemstype: " + valgt.length + " valgt";
+}
+function udfyldFiltre() {
+  const lande = Array.from(new Set(alleRecords.map(function (r) { return F(r, "land"); }).filter(Boolean)))
+    .sort(function (a, b) { return a.localeCompare(b, "da"); });
+  const brands = Array.from(new Set(alleRecords.map(function (r) { return F(r, "brand"); }).filter(Boolean)))
+    .sort(function (a, b) { return a.localeCompare(b, "da"); });
+  lande.forEach(function (l) { const o = document.createElement("option"); o.value = l; o.textContent = l; $("fLand").appendChild(o); });
+  brands.forEach(function (b) { const o = document.createElement("option"); o.value = b; o.textContent = b; $("fBrand").appendChild(o); });
+}
 function anvendFilter() {
-  const land  = $("fLand").value;
-  const brand = $("fBrand").value;
-  const soeg  = $("fSoeg").value.trim().toLowerCase();
-
+  const land = $("fLand").value, brand = $("fBrand").value, soeg = $("fSoeg").value.trim().toLowerCase();
+  const kunForael = $("fForael").checked;
+  const mtyper = valgteMedlemstyper();
+  const alleValgt = mtyper.length === CONFIG.konto.alleMedlemstyper.length;
   const liste = alleRecords.filter(function (r) {
     if (land && F(r, "land") !== land) return false;
     if (brand && F(r, "brand") !== brand) return false;
+    if (kunForael && !bekraeftStatus(r).foraeldet) return false;
+    if (!alleValgt) { const mt = medlemstypeForAfd(r); if (mt && mtyper.indexOf(mt) === -1) return false; }
     if (soeg) {
       const tekst = [F(r, "navn"), F(r, "by"), F(r, "adresse"), F(r, "brand"), F(r, "land")]
         .filter(Boolean).join(" ").toLowerCase();
@@ -315,68 +305,61 @@ function anvendFilter() {
     }
     return true;
   });
-
   const res = tegnMarkers(liste);
   $("taeller").textContent = res.viste + " af " + alleRecords.length + " afdelinger";
 }
-
 function startGlobalTilstand() {
   $("filterbar").hidden = false;
   udfyldFiltre();
+  opsaetMedlemstypeMultiselect();
   $("fLand").addEventListener("change", anvendFilter);
   $("fBrand").addEventListener("change", anvendFilter);
   $("fSoeg").addEventListener("input", anvendFilter);
+  $("fForael").addEventListener("change", anvendFilter);
   $("fNulstil").addEventListener("click", function () {
-    $("fLand").value = ""; $("fBrand").value = ""; $("fSoeg").value = "";
-    anvendFilter();
+    $("fLand").value = ""; $("fBrand").value = ""; $("fSoeg").value = ""; $("fForael").checked = false;
+    Array.prototype.forEach.call(document.querySelectorAll(".mtype"), function (c) { c.checked = true; });
+    opdaterMsSummary(); anvendFilter();
+  });
+  document.addEventListener("click", function (e) {
+    const ms = $("msMedlemstype"); if (ms && ms.open && !ms.contains(e.target)) ms.open = false;
   });
   anvendFilter();
 }
-
 /* ---------- opstart ---------- */
-
 async function vedPageLoad(data) {
   if (startTimeout) { clearTimeout(startTimeout); startTimeout = null; }
   try {
     visBesked("Henter afdelinger …");
-    alleRecords = await hentAlle();
+    const resultater = await Promise.all([hentAlle(), hentKontoMap()]);
+    alleRecords = resultater[0];
+    kontoMap = resultater[1];
     skjulBesked();
-
     const entitet = data && (data.Entity || data.entity);
     let id = data && (data.EntityId || data.entityId);
     if (Array.isArray(id)) id = id[0];
-
     if (entitet === "Accounts" && id) {
-      tilstand.mode = "medlem";
-      tilstand.kontoId = id;
+      tilstand.mode = "medlem"; tilstand.kontoId = id;
       try {
         const k = await ZOHO.CRM.API.getRecord({ Entity: "Accounts", RecordID: id });
         if (k && k.data && k.data[0]) tilstand.kontoNavn = k.data[0].Account_Name || "";
       } catch (e) { console.warn("Kunne ikke hente kontonavn:", e); }
       startMedlemstilstand();
     } else {
-      tilstand.mode = "global";
-      startGlobalTilstand();
+      tilstand.mode = "global"; startGlobalTilstand();
     }
-  } catch (fejl) {
-    visFejl(fejl);
-  }
+  } catch (fejl) { visFejl(fejl); }
 }
-
 document.addEventListener("DOMContentLoaded", function () {
   initKort();
-
   if (!window.ZOHO || !ZOHO.embeddedApp) {
     visBesked("Zoho-SDK'et kunne ikke indlæses. Siden skal åbnes inde fra Zoho CRM.", true);
     return;
   }
-
-  // Hvis PageLoad aldrig affyres, vises en forklaring (fx ved åbning uden for CRM)
   startTimeout = setTimeout(function () {
-    visBesked("Denne side skal åbnes inde i Zoho CRM (som relateret liste eller webfane) – " +
-              "den virker ikke som selvstændig fil.", true);
+    visBesked("Denne side skal åbnes inde i Zoho CRM (som relateret liste eller webfane) – "
+      + "den virker ikke som selvstændig fil.", true);
   }, 10000);
-
   ZOHO.embeddedApp.on("PageLoad", vedPageLoad);
   ZOHO.embeddedApp.init();
 });
