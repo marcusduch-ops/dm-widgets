@@ -25,7 +25,7 @@
   .top select, .top input {
          padding: 6px 8px; border: 1px solid #c9c9c9; border-radius: 6px;
          font-size: 13px; background: #fff; }
-  .top input[type=text] { min-width: 200px; }
+  .top input[type=text] { min-width: 190px; }
   .top button, .knap { padding: 6px 12px; border: 1px solid #c9c9c9;
          border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; }
   .top button:hover, .knap:hover { background: #f0f0f0; }
@@ -43,6 +43,20 @@
   #taeller { font-size: 12.5px; color: #555; margin-left: auto; }
   #kunForael { font-size: 12.5px; color: #555; display: flex; align-items: center; gap: 5px; }
 
+  /* Multi-select (medlemstype) */
+  .ms { position: relative; }
+  .ms > summary { list-style: none; cursor: pointer; padding: 6px 10px;
+         border: 1px solid #c9c9c9; border-radius: 6px; background: #fff;
+         font-size: 13px; user-select: none; }
+  .ms > summary::-webkit-details-marker { display: none; }
+  .ms > summary::after { content: " ▾"; color: #888; }
+  .ms-panel { position: absolute; z-index: 20; top: 112%; left: 0; background: #fff;
+         border: 1px solid #c9c9c9; border-radius: 8px; padding: 8px 10px;
+         box-shadow: 0 4px 14px rgba(0,0,0,.12); min-width: 200px; }
+  .ms-panel label { display: flex; align-items: center; gap: 6px; font-size: 13px;
+         padding: 3px 0; white-space: nowrap; cursor: pointer; }
+  .ms-panel input { min-width: auto; }
+
   /* Tabel */
   .tabelboks { flex: 1; overflow: auto; }
   table { border-collapse: collapse; width: 100%; font-size: 13px; }
@@ -59,6 +73,13 @@
   td input.celle { width: 100%; box-sizing: border-box; padding: 4px 6px;
              border: 1px solid #9fb6d4; border-radius: 5px; font-size: 13px;
              font-family: inherit; }
+  td select.celle-type { width: 100%; box-sizing: border-box; padding: 4px 6px;
+             border: 1px solid #9fb6d4; border-radius: 5px; font-size: 13px;
+             font-family: inherit; background: #fff; }
+  .hk-badge { display: inline-block; font-size: 11px; padding: 1px 7px;
+             border-radius: 10px; background: #e9f7ec; color: #1c6b2c;
+             border: 1px solid #bfe0c6; white-space: nowrap; }
+  .mtype-tekst { font-size: 12px; color: #666; }
   .bekraeft-celle { white-space: nowrap; }
   .bekraeft-dato { font-variant-numeric: tabular-nums; }
   .bekraeft-dato.foraeldet { color: #c0392b; font-weight: 600; }
@@ -77,8 +98,7 @@
   .formboks { flex: 1; overflow: auto; padding: 18px 20px; }
   .form { max-width: 560px; }
   .felt { margin-bottom: 14px; }
-  .felt label { display: block; font-size: 13px; font-weight: 600;
-                margin-bottom: 4px; }
+  .felt label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
   .felt .paakraevet { color: #c0392b; }
   .felt input, .felt select, .felt textarea {
         width: 100%; box-sizing: border-box; padding: 8px 10px;
@@ -87,8 +107,7 @@
   .felt input:focus, .felt select:focus { outline: 2px solid #1a56a0; }
   .hjaelp { font-size: 12px; color: #666; margin-top: 3px; }
   .info-geo { background: #eef4fb; border: 1px solid #cfe0f3; color: #234;
-              padding: 10px 12px; border-radius: 8px; font-size: 13px;
-              margin-bottom: 16px; }
+              padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
   .fejltekst { color: #c0392b; font-size: 12px; margin-top: 3px; }
   .formknapper { display: flex; gap: 10px; margin-top: 6px; }
 
@@ -109,6 +128,10 @@
 <div id="visOversigt">
   <div class="top">
     <select id="fVirksomhed"><option value="">Alle virksomheder</option></select>
+    <details class="ms" id="msMedlemstype">
+      <summary id="msSummary">Medlemstype: alle</summary>
+      <div class="ms-panel" id="msPanel"></div>
+    </details>
     <select id="fRegion"><option value="">Alle regioner</option></select>
     <select id="fLand"><option value="">Alle lande</option></select>
     <input id="fSoeg" type="text" placeholder="Søg afdeling, by eller adresse …">
@@ -123,6 +146,8 @@
         <tr>
           <th>Afdeling</th>
           <th>Virksomhed</th>
+          <th>Medlemstype</th>
+          <th>Type</th>
           <th>Region</th>
           <th>Land</th>
           <th>By</th>
@@ -159,6 +184,12 @@
         <select id="oMedlem"><option value="">Vælg medlem …</option></select>
         <div class="hjaelp">Kun aktive medlemmer kan vælges – rene kontakter vises ikke.</div>
         <div class="fejltekst" id="eMedlem" hidden>Vælg et medlem.</div>
+      </div>
+
+      <div class="felt">
+        <label>Afdelingstype <span style="font-weight:400;color:#888;">(valgfrit)</span></label>
+        <select id="oType"><option value="">(ingen)</option></select>
+        <div class="hjaelp">Vælg fx “Dansk hovedkontor” for medlemmets hovedadresse.</div>
       </div>
 
       <div class="felt">
@@ -214,46 +245,45 @@
 const CONFIG = {
   modul: "Afdelinger",
   felter: {
-    navn:      "Name",
-    medlem:    "Medlem",
-    brand:     "Brand",
-    land:      "Land",
-    adresse:   "Adresse",
-    postnr:    "Postnummer",
-    by:        "By",
-    website:   "Website",
-    lat:       "Latitude",
-    lon:       "Longitude",
-    geonoegle: "Geokodningsnoegle",
-    bekraeftet:"Sidst_bekraeftet"   // Date-felt i CRM
+    navn:         "Name",
+    medlem:       "Medlem",
+    brand:        "Brand",
+    land:         "Land",
+    adresse:      "Adresse",
+    postnr:       "Postnummer",
+    by:           "By",
+    website:      "Website",
+    lat:          "Latitude",
+    lon:          "Longitude",
+    geonoegle:    "Geokodningsnoegle",
+    bekraeftet:   "Sidst_bekraeftet",
+    afdelingstype:"Afdelingstype"
   },
-  // Hvor gammel må en bekræftelse være, før den bliver rød? (dage)
   bekraeftGraenseDage: 365,
 
-  /* -------------------------------------------------------------------
-     MEDLEMMER — hvem må man tildele afdelinger til?
-     Kun konti med en af nedenstående medlemstyper vises i dropdownen,
-     så man ikke kan oprette afdelinger under rene kontakter.
-     ------------------------------------------------------------------- */
+  // Værdien i Afdelingstype-picklisten der markerer en hovedadresse:
+  hovedkontorType: "Dansk hovedkontor",
+  // Mulige Afdelingstyper (skal matche picklisten i CRM):
+  afdelingstypeVaerdier: ["Dansk hovedkontor", "Produktion", "Salg & service",
+                          "Kontor", "Værft", "Andet"],
+
   konto: {
-    navnFelt:        "Account_Name",   // primærfeltets API-navn på Accounts
-    medlemstypeFelt: "Medlemstype",    // API-navnet på medlemstype-feltet — VERIFICÉR i CRM
-    // Alle medlemstyper i CRM (til reference):
-    //   "DI - Ordinær", "Associeret", "Iværksættermedlem", "Støttemedlem"
-    // Støttemedlem er udeladt, jf. beslutningen om at støttemedlemmer
-    // ikke indgår i afdelingskortet. Vil du inkludere dem, så tilføj
-    // "Støttemedlem" til listen herunder.
-    gyldigeMedlemstyper: ["DI - Ordinær", "Associeret", "Iværksættermedlem"]
+    navnFelt:        "Account_Name",
+    medlemstypeFelt: "Medlemstype",
+    // Medlemstyper der må tildeles afdelinger i OPRET-formularen.
+    // (Støttemedlem udeladt her, så man ikke kan tilføje nye afdelinger
+    //  til støttemedlemmer manuelt – men de MÅ vises på kort/liste via
+    //  deres hovedkontor, jf. hovedkontor-funktionen.)
+    gyldigeMedlemstyper: ["DI - Ordinær", "Associeret", "Iværksættermedlem"],
+    // Medlemstyper der overhovedet vises som filter-valg og på kort/liste:
+    alleMedlemstyper: ["DI - Ordinær", "Associeret", "Iværksættermedlem", "Støttemedlem"]
   }
 };
 
-/* Er en kontos medlemstype gyldig? (robust: trimmer + ignorerer store/små bogstaver) */
-function erMedlem(medlemstype) {
+function erGyldigtMedlem(medlemstype) {
   if (!medlemstype) return false;
   const t = String(medlemstype).trim().toLowerCase();
-  return CONFIG.konto.gyldigeMedlemstyper.some(function (g) {
-    return g.trim().toLowerCase() === t;
-  });
+  return CONFIG.konto.gyldigeMedlemstyper.some(function (g) { return g.trim().toLowerCase() === t; });
 }
 
 /* ---------------------------------------------------------------------
@@ -262,8 +292,7 @@ function erMedlem(medlemstype) {
 const REGIONER = {
   "Norden": ["Danmark","Færøerne","Grønland","Island","Norge","Sverige","Finland","Åland"],
   "Vesteuropa": ["Tyskland","Nederlandene","Holland","Belgien","Frankrig","Storbritannien",
-    "Storbritanien","England","Skotland","Irland","Luxembourg","Østrig","Schweiz",
-    "Liechtenstein","Monaco"],
+    "Storbritanien","England","Skotland","Irland","Luxembourg","Østrig","Schweiz","Liechtenstein","Monaco"],
   "Sydeuropa": ["Spanien","Portugal","Italien","Grækenland","Malta","Cypern","Kroatien",
     "Slovenien","San Marino","Andorra","Gibraltar"],
   "Østeuropa": ["Polen","Tjekkiet","Slovakiet","Ungarn","Rumænien","Bulgarien","Estland",
@@ -283,33 +312,24 @@ const REGIONER = {
     "Congo","DR Congo","Den Demokratiske Republik Congo","Cameroun","Etiopien","Sudan",
     "Djibouti","Mauritius","Togo","Gabon","Ækvatorialguinea","Liberia","Guinea"],
   "Sydasien": ["Indien","Pakistan","Bangladesh","Sri Lanka","Nepal","Maldiverne","Bhutan"],
-  "Østasien": ["Kina","Japan","Sydkorea","Nordkorea","Taiwan","Hongkong","Hong Kong",
-    "Macao","Mongoliet"],
+  "Østasien": ["Kina","Japan","Sydkorea","Nordkorea","Taiwan","Hongkong","Hong Kong","Macao","Mongoliet"],
   "Sydøstasien": ["Singapore","Malaysia","Indonesien","Thailand","Vietnam","Filippinerne",
     "Myanmar","Cambodja","Laos","Brunei","Østtimor"],
-  "Centralasien": ["Kasakhstan","Usbekistan","Turkmenistan","Kirgisistan","Tadsjikistan",
-    "Afghanistan"],
+  "Centralasien": ["Kasakhstan","Usbekistan","Turkmenistan","Kirgisistan","Tadsjikistan","Afghanistan"],
   "Oceanien": ["Australien","New Zealand","Papua Ny Guinea","Fiji","Ny Kaledonien"]
 };
 const LAND_TIL_REGION = {};
 Object.keys(REGIONER).forEach(function (region) {
-  REGIONER[region].forEach(function (land) {
-    LAND_TIL_REGION[land.toLowerCase()] = region;
-  });
+  REGIONER[region].forEach(function (land) { LAND_TIL_REGION[land.toLowerCase()] = region; });
 });
 function regionForLand(land) {
   if (!land) return "Ukendt";
-  const r = LAND_TIL_REGION[String(land).trim().toLowerCase()];
-  return r || "Øvrige";
+  return LAND_TIL_REGION[String(land).trim().toLowerCase()] || "Øvrige";
 }
 
-/* ---------------------------------------------------------------------
-   BEKRÆFTELSES-STATUS
-   --------------------------------------------------------------------- */
+/* ---------- bekræftelses-status ---------- */
 function toCifre(n) { return (n < 10 ? "0" : "") + n; }
-function datoISO(d) {
-  return d.getFullYear() + "-" + toCifre(d.getMonth() + 1) + "-" + toCifre(d.getDate());
-}
+function datoISO(d) { return d.getFullYear() + "-" + toCifre(d.getMonth() + 1) + "-" + toCifre(d.getDate()); }
 function idagISO() { return datoISO(new Date()); }
 function bekraeftStatus(rec) {
   const raa = F(rec, "bekraeftet");
@@ -322,7 +342,8 @@ function bekraeftStatus(rec) {
 
 /* ===================================================================== */
 let alleRecords = [];
-let alleKonti = [];   // KUN medlemmer (filtreret på medlemstype)
+let alleKonti = [];              // KUN medlemmer man må vælge i opret-dropdown
+let kontoMap = {};               // ALLE konti: id -> { navn, type }
 const ctx = { entity: null, kontoId: null, kontoNavn: "" };
 let startTimeout = null;
 let redigererId = null;
@@ -347,13 +368,19 @@ function visFejl(fejl) {
     + "og send den i chatten – så finder vi fejlen sammen.", "fejl");
 }
 
+/* medlemstype for en afdeling – slås op via Medlem-lookup i kontoMap */
+function medlemstypeForAfd(r) {
+  const m = F(r, "medlem");
+  if (!m || !m.id) return null;
+  const k = kontoMap[String(m.id)];
+  return k ? k.type : null;
+}
+
 /* ---------- datahentning ---------- */
 async function hentAlleAfdelinger() {
   let side = 1, ud = [];
   while (side <= 25) {
-    const svar = await ZOHO.CRM.API.getAllRecords({
-      Entity: CONFIG.modul, sort_order: "asc", per_page: 200, page: side
-    });
+    const svar = await ZOHO.CRM.API.getAllRecords({ Entity: CONFIG.modul, sort_order: "asc", per_page: 200, page: side });
     const data = (svar && svar.data) ? svar.data : [];
     ud = ud.concat(data);
     if (data.length < 200) break;
@@ -362,44 +389,67 @@ async function hentAlleAfdelinger() {
   return ud;
 }
 async function hentAlleKonti() {
-  let side = 1, ud = [], ialt = 0;
+  let side = 1, medlemmer = [], map = {}, ialt = 0;
   while (side <= 25) {
-    const svar = await ZOHO.CRM.API.getAllRecords({
-      Entity: "Accounts", sort_order: "asc", per_page: 200, page: side
-    });
+    const svar = await ZOHO.CRM.API.getAllRecords({ Entity: "Accounts", sort_order: "asc", per_page: 200, page: side });
     const data = (svar && svar.data) ? svar.data : [];
     data.forEach(function (k) {
       ialt++;
-      const type = k[CONFIG.konto.medlemstypeFelt];
-      if (erMedlem(type)) {
-        ud.push({ id: k.id, navn: k[CONFIG.konto.navnFelt] || "", type: type });
-      }
+      const navn = k[CONFIG.konto.navnFelt] || "";
+      const type = k[CONFIG.konto.medlemstypeFelt] || "";
+      map[String(k.id)] = { navn: navn, type: type };
+      if (erGyldigtMedlem(type)) medlemmer.push({ id: k.id, navn: navn, type: type });
     });
     if (data.length < 200) break;
     side++;
   }
-  ud.sort(function (a, b) { return a.navn.localeCompare(b.navn, "da"); });
-  console.log("Konti hentet:", ialt, "– heraf medlemmer:", ud.length);
-  return ud;
+  medlemmer.sort(function (a, b) { return a.navn.localeCompare(b.navn, "da"); });
+  console.log("Konti hentet:", ialt, "– heraf valgbare medlemmer:", medlemmer.length);
+  return { medlemmer: medlemmer, map: map };
 }
 function recordById(id) {
   return alleRecords.filter(function (r) { return String(r.id) === String(id); })[0];
 }
 
 /* =====================================================================
+   MEDLEMSTYPE MULTI-SELECT
+   ===================================================================== */
+function opsaetMedlemstypeMultiselect() {
+  const panel = $("msPanel");
+  panel.innerHTML = "";
+  CONFIG.konto.alleMedlemstyper.forEach(function (t) {
+    const label = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.className = "mtype"; cb.value = t; cb.checked = true;
+    cb.addEventListener("change", function () { opdaterMsSummary(); tegnTabel(); });
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(" " + t));
+    panel.appendChild(label);
+  });
+  opdaterMsSummary();
+}
+function valgteMedlemstyper() {
+  return Array.prototype.filter.call(document.querySelectorAll(".mtype"), function (c) { return c.checked; })
+    .map(function (c) { return c.value; });
+}
+function opdaterMsSummary() {
+  const valgt = valgteMedlemstyper();
+  const alle = CONFIG.konto.alleMedlemstyper.length;
+  $("msSummary").textContent = (valgt.length === alle)
+    ? "Medlemstype: alle"
+    : "Medlemstype: " + valgt.length + " valgt";
+}
+
+/* =====================================================================
    OVERSIGT
    ===================================================================== */
 function udfyldFiltre() {
-  const virks = Array.from(new Set(
-    alleRecords.map(function (r) { return F(r, "brand"); }).filter(Boolean)
-  )).sort(function (a, b) { return a.localeCompare(b, "da"); });
-  const lande = Array.from(new Set(
-    alleRecords.map(function (r) { return F(r, "land"); }).filter(Boolean)
-  )).sort(function (a, b) { return a.localeCompare(b, "da"); });
-  const regioner = Array.from(new Set(
-    alleRecords.map(function (r) { return regionForLand(F(r, "land")); })
-  )).sort(function (a, b) { return a.localeCompare(b, "da"); });
-
+  const virks = Array.from(new Set(alleRecords.map(function (r) { return F(r, "brand"); }).filter(Boolean)))
+    .sort(function (a, b) { return a.localeCompare(b, "da"); });
+  const lande = Array.from(new Set(alleRecords.map(function (r) { return F(r, "land"); }).filter(Boolean)))
+    .sort(function (a, b) { return a.localeCompare(b, "da"); });
+  const regioner = Array.from(new Set(alleRecords.map(function (r) { return regionForLand(F(r, "land")); })))
+    .sort(function (a, b) { return a.localeCompare(b, "da"); });
   virks.forEach(function (v) { tilfoejOption("fVirksomhed", v); });
   regioner.forEach(function (v) { tilfoejOption("fRegion", v); });
   lande.forEach(function (v) { tilfoejOption("fLand", v); });
@@ -416,11 +466,18 @@ function filtreretListe() {
   const land   = $("fLand").value;
   const soeg   = $("fSoeg").value.trim().toLowerCase();
   const kunForael = $("fForael").checked;
+  const mtyper = valgteMedlemstyper();
+  const alleValgt = mtyper.length === CONFIG.konto.alleMedlemstyper.length;
   return alleRecords.filter(function (r) {
     if (virk && F(r, "brand") !== virk) return false;
     if (land && F(r, "land") !== land) return false;
     if (region && regionForLand(F(r, "land")) !== region) return false;
     if (kunForael && !bekraeftStatus(r).foraeldet) return false;
+    if (!alleValgt) {
+      const mt = medlemstypeForAfd(r);
+      // Ukendt medlemstype vises altid, så data aldrig forsvinder tavst
+      if (mt && mtyper.indexOf(mt) === -1) return false;
+    }
     if (soeg) {
       const tekst = [F(r, "navn"), F(r, "by"), F(r, "adresse"), F(r, "brand"), F(r, "land")]
         .filter(Boolean).join(" ").toLowerCase();
@@ -439,11 +496,8 @@ function tegnTabel() {
     if (bekraeftStatus(r).foraeldet) antalForael++;
     const tr = document.createElement("tr");
     tr.setAttribute("data-id", r.id);
-    if (String(r.id) === String(redigererId)) {
-      byggRedigerRaekke(tr, r);
-    } else {
-      byggVisRaekke(tr, r);
-    }
+    if (String(r.id) === String(redigererId)) byggRedigerRaekke(tr, r);
+    else byggVisRaekke(tr, r);
     krop.appendChild(tr);
   });
   $("tomBesked").hidden = liste.length > 0;
@@ -452,23 +506,29 @@ function tegnTabel() {
   return liste;
 }
 
-/* ---- bekræftelses-celle ---- */
+function typeCelleHtml(r) {
+  const t = F(r, "afdelingstype");
+  if (!t) return "<td></td>";
+  if (t === CONFIG.hovedkontorType) return '<td><span class="hk-badge">🏢 ' + esc(t) + "</span></td>";
+  return "<td>" + esc(t) + "</td>";
+}
 function bekraeftCelleHtml(r) {
   const s = bekraeftStatus(r);
   const datoKlasse = "bekraeft-dato" + (s.foraeldet ? " foraeldet" : "");
   const badge = s.foraeldet ? '<span class="bekraeft-badge">Tjek</span>' : "";
   return '<td class="bekraeft-celle">'
     + '<span class="' + datoKlasse + '">' + esc(s.tekst) + "</span>" + badge
-    + '<br><button class="knap-lille knap-bekraeft" data-akt="bekraeft">✓ Genbekræft</button>'
-    + '</td>';
+    + '<br><button class="knap-lille knap-bekraeft" data-akt="bekraeft">✓ Genbekræft</button></td>';
 }
 
-/* ---- visningsrække ---- */
 function byggVisRaekke(tr, r) {
   tr.className = "";
+  const mt = medlemstypeForAfd(r);
   tr.innerHTML =
       "<td>" + esc(F(r, "navn")) + "</td>"
     + "<td>" + esc(F(r, "brand")) + "</td>"
+    + '<td><span class="mtype-tekst">' + esc(mt || "–") + "</span></td>"
+    + typeCelleHtml(r)
     + "<td>" + esc(regionForLand(F(r, "land"))) + "</td>"
     + "<td>" + esc(F(r, "land")) + "</td>"
     + "<td>" + esc(F(r, "by")) + "</td>"
@@ -478,83 +538,80 @@ function byggVisRaekke(tr, r) {
     + '<td class="handling">'
     +   '<button class="knap-lille" data-akt="ret">✏ Ret</button>'
     +   '<button class="knap-lille knap-slet" data-akt="slet">🗑 Slet</button>'
-    +   '<button class="knap-lille" data-akt="crm">CRM ↗</button>'
-    + '</td>';
+    +   '<button class="knap-lille" data-akt="crm">CRM ↗</button></td>';
   tr.querySelector('[data-akt="bekraeft"]').addEventListener("click", function () { genbekraeft(r.id); });
   tr.querySelector('[data-akt="ret"]').addEventListener("click", function () { startRedigering(r.id); });
   tr.querySelector('[data-akt="slet"]').addEventListener("click", function () { sletAfdeling(r.id); });
   tr.querySelector('[data-akt="crm"]').addEventListener("click", function () {
-    try { ZOHO.CRM.UI.Record.open({ Entity: CONFIG.modul, RecordID: r.id }); }
-    catch (e) { console.error(e); }
+    try { ZOHO.CRM.UI.Record.open({ Entity: CONFIG.modul, RecordID: r.id }); } catch (e) { console.error(e); }
   });
 }
 
-/* ---- redigeringsrække ---- */
-function inputCelle(vaerdi) {
-  return '<td><input class="celle" value="' + esc(vaerdi) + '"></td>';
+function inputCelle(vaerdi) { return '<td><input class="celle" value="' + esc(vaerdi) + '"></td>'; }
+function typeSelectCelle(valgt) {
+  let html = '<td><select class="celle-type"><option value="">(ingen)</option>';
+  CONFIG.afdelingstypeVaerdier.forEach(function (t) {
+    html += '<option value="' + esc(t) + '"' + (t === valgt ? " selected" : "") + ">" + esc(t) + "</option>";
+  });
+  return html + "</select></td>";
 }
 function byggRedigerRaekke(tr, r) {
   const s = bekraeftStatus(r);
+  const mt = medlemstypeForAfd(r);
   tr.className = "redigerer";
   tr.innerHTML =
-      inputCelle(F(r, "navn"))                       // 0 navn
-    + inputCelle(F(r, "brand"))                      // 1 brand
-    + "<td>" + esc(regionForLand(F(r, "land"))) + "</td>" // region (auto)
-    + inputCelle(F(r, "land"))                       // 2 land
-    + inputCelle(F(r, "by"))                         // 3 by
-    + inputCelle(F(r, "adresse"))                    // 4 adresse
-    + inputCelle(F(r, "postnr"))                     // 5 postnr
+      inputCelle(F(r, "navn"))                              // input 0 navn
+    + inputCelle(F(r, "brand"))                             // input 1 brand
+    + '<td><span class="mtype-tekst">' + esc(mt || "–") + "</span></td>"  // medlemstype (auto)
+    + typeSelectCelle(F(r, "afdelingstype"))                // afdelingstype select
+    + "<td>" + esc(regionForLand(F(r, "land"))) + "</td>"   // region (auto)
+    + inputCelle(F(r, "land"))                              // input 2 land
+    + inputCelle(F(r, "by"))                                // input 3 by
+    + inputCelle(F(r, "adresse"))                           // input 4 adresse
+    + inputCelle(F(r, "postnr"))                            // input 5 postnr
     + '<td class="bekraeft-celle"><span class="bekraeft-dato'
         + (s.foraeldet ? " foraeldet" : "") + '">' + esc(s.tekst) + "</span></td>"
     + '<td class="handling">'
     +   '<button class="knap-lille knap-gem" data-akt="gem">💾 Gem</button>'
-    +   '<button class="knap-lille" data-akt="fortryd">Fortryd</button>'
-    + '</td>';
+    +   '<button class="knap-lille" data-akt="fortryd">Fortryd</button></td>';
   tr.querySelector('[data-akt="gem"]').addEventListener("click", function () { gemRedigering(r.id, tr); });
-  tr.querySelector('[data-akt="fortryd"]').addEventListener("click", function () {
-    redigererId = null; tegnTabel();
-  });
+  tr.querySelector('[data-akt="fortryd"]').addEventListener("click", function () { redigererId = null; tegnTabel(); });
 }
 
-function startRedigering(id) {
-  redigererId = id;
-  tegnTabel();
-}
+function startRedigering(id) { redigererId = id; tegnTabel(); }
 
-/* ---- genbekræft: sæt Sidst bekræftet = i dag ---- */
 function genbekraeft(id) {
   const r = recordById(id);
   if (!r) return;
   const idag = idagISO();
-  const data = {};
-  data[CONFIG.felter.bekraeftet] = idag;
+  const data = {}; data[CONFIG.felter.bekraeftet] = idag;
   skjulBesked();
-  ZOHO.CRM.API.updateRecord({
-    Entity: CONFIG.modul, RecordID: id, APIData: data, Trigger: []
-  }).then(function (svar) {
-    const res = svar && svar.data && svar.data[0];
-    if (res && res.code === "SUCCESS") {
-      r[CONFIG.felter.bekraeftet] = idag;
-      tegnTabel();
-      visBesked("✔ \u201E" + (F(r, "navn") || "Afdeling") + "\u201C bekræftet i dag (" + idag + ").", "ok");
-    } else {
-      visBesked("Kunne ikke bekræfte: " + (res && res.message ? res.message : "ukendt fejl."), "fejl");
-      console.error("updateRecord (bekræft) svar:", svar);
-    }
-  }).catch(function (fejl) { visFejl(fejl); });
+  ZOHO.CRM.API.updateRecord({ Entity: CONFIG.modul, RecordID: id, APIData: data, Trigger: [] })
+    .then(function (svar) {
+      const res = svar && svar.data && svar.data[0];
+      if (res && res.code === "SUCCESS") {
+        r[CONFIG.felter.bekraeftet] = idag; tegnTabel();
+        visBesked("✔ \u201E" + (F(r, "navn") || "Afdeling") + "\u201C bekræftet i dag (" + idag + ").", "ok");
+      } else {
+        visBesked("Kunne ikke bekræfte: " + (res && res.message ? res.message : "ukendt fejl."), "fejl");
+        console.error("updateRecord (bekræft) svar:", svar);
+      }
+    }).catch(function (fejl) { visFejl(fejl); });
 }
 
 function gemRedigering(id, tr) {
   const r = recordById(id);
   if (!r) return;
   const inputs = tr.querySelectorAll("input.celle");
+  const typeSel = tr.querySelector("select.celle-type");
   const nye = {
     navn:    inputs[0].value.trim(),
     brand:   inputs[1].value.trim(),
     land:    inputs[2].value.trim(),
     by:      inputs[3].value.trim(),
     adresse: inputs[4].value.trim(),
-    postnr:  inputs[5].value.trim()
+    postnr:  inputs[5].value.trim(),
+    type:    typeSel ? typeSel.value : ""
   };
   if (!nye.navn) { visBesked("Afdelingsnavn må ikke være tomt.", "fejl"); return; }
 
@@ -565,50 +622,38 @@ function gemRedigering(id, tr) {
   data[CONFIG.felter.by]      = nye.by;
   data[CONFIG.felter.adresse] = nye.adresse;
   data[CONFIG.felter.postnr]  = nye.postnr;
+  data[CONFIG.felter.afdelingstype] = nye.type;   // "" nulstiller picklisten
   const idag = idagISO();
   data[CONFIG.felter.bekraeftet] = idag;
 
   const byAendret   = String(F(r, "by")   || "") !== nye.by;
   const landAendret = String(F(r, "land") || "") !== nye.land;
   if (byAendret || landAendret) {
-    data[CONFIG.felter.lat] = null;
-    data[CONFIG.felter.lon] = null;
-    data[CONFIG.felter.geonoegle] = null;
+    data[CONFIG.felter.lat] = null; data[CONFIG.felter.lon] = null; data[CONFIG.felter.geonoegle] = null;
   }
 
   const gemKnap = tr.querySelector('[data-akt="gem"]');
   gemKnap.disabled = true;
   skjulBesked();
 
-  ZOHO.CRM.API.updateRecord({
-    Entity: CONFIG.modul, RecordID: id, APIData: data, Trigger: ["workflow"]
-  }).then(function (svar) {
-    const res = svar && svar.data && svar.data[0];
-    if (res && res.code === "SUCCESS") {
-      r[CONFIG.felter.navn] = nye.navn;
-      r[CONFIG.felter.brand] = nye.brand;
-      r[CONFIG.felter.land] = nye.land;
-      r[CONFIG.felter.by] = nye.by;
-      r[CONFIG.felter.adresse] = nye.adresse;
-      r[CONFIG.felter.postnr] = nye.postnr;
-      r[CONFIG.felter.bekraeftet] = idag;
-      if (byAendret || landAendret) {
-        r[CONFIG.felter.lat] = null; r[CONFIG.felter.lon] = null;
+  ZOHO.CRM.API.updateRecord({ Entity: CONFIG.modul, RecordID: id, APIData: data, Trigger: ["workflow"] })
+    .then(function (svar) {
+      const res = svar && svar.data && svar.data[0];
+      if (res && res.code === "SUCCESS") {
+        r[CONFIG.felter.navn] = nye.navn; r[CONFIG.felter.brand] = nye.brand;
+        r[CONFIG.felter.land] = nye.land; r[CONFIG.felter.by] = nye.by;
+        r[CONFIG.felter.adresse] = nye.adresse; r[CONFIG.felter.postnr] = nye.postnr;
+        r[CONFIG.felter.afdelingstype] = nye.type; r[CONFIG.felter.bekraeftet] = idag;
+        if (byAendret || landAendret) { r[CONFIG.felter.lat] = null; r[CONFIG.felter.lon] = null; }
+        redigererId = null; genopbygFiltre(); tegnTabel();
+        visBesked("✔ \u201E" + nye.navn + "\u201C er gemt og bekræftet i dag."
+          + ((byAendret || landAendret) ? " Nye koordinater hentes automatisk om få sekunder." : ""), "ok");
+      } else {
+        gemKnap.disabled = false;
+        visBesked("Kunne ikke gemme: " + (res && res.message ? res.message : "ukendt fejl."), "fejl");
+        console.error("updateRecord svar:", svar);
       }
-      redigererId = null;
-      genopbygFiltre();
-      tegnTabel();
-      visBesked("✔ \u201E" + nye.navn + "\u201C er gemt og bekræftet i dag."
-        + ((byAendret || landAendret) ? " Nye koordinater hentes automatisk om få sekunder." : ""), "ok");
-    } else {
-      gemKnap.disabled = false;
-      visBesked("Kunne ikke gemme: " + (res && res.message ? res.message : "ukendt fejl."), "fejl");
-      console.error("updateRecord svar:", svar);
-    }
-  }).catch(function (fejl) {
-    gemKnap.disabled = false;
-    visFejl(fejl);
-  });
+    }).catch(function (fejl) { gemKnap.disabled = false; visFejl(fejl); });
 }
 
 function sletAfdeling(id) {
@@ -622,24 +667,19 @@ function sletAfdeling(id) {
       if (res && res.code === "SUCCESS") {
         alleRecords = alleRecords.filter(function (x) { return String(x.id) !== String(id); });
         if (String(redigererId) === String(id)) redigererId = null;
-        genopbygFiltre();
-        tegnTabel();
+        genopbygFiltre(); tegnTabel();
         visBesked("🗑 \u201E" + navn + "\u201C er slettet.", "ok");
       } else {
         visBesked("Kunne ikke slette: " + (res && res.message ? res.message : "ukendt fejl."), "fejl");
         console.error("deleteRecord svar:", svar);
       }
-    })
-    .catch(function (fejl) { visFejl(fejl); });
+    }).catch(function (fejl) { visFejl(fejl); });
 }
 
 function genopbygFiltre() {
-  const gemtVirk = $("fVirksomhed").value;
-  const gemtReg  = $("fRegion").value;
-  const gemtLand = $("fLand").value;
+  const gemtVirk = $("fVirksomhed").value, gemtReg = $("fRegion").value, gemtLand = $("fLand").value;
   ["fVirksomhed", "fRegion", "fLand"].forEach(function (id) {
-    const sel = $(id);
-    while (sel.options.length > 1) sel.remove(1);
+    const sel = $(id); while (sel.options.length > 1) sel.remove(1);
   });
   udfyldFiltre();
   if ([].some.call($("fVirksomhed").options, function (o) { return o.value === gemtVirk; })) $("fVirksomhed").value = gemtVirk;
@@ -650,53 +690,43 @@ function genopbygFiltre() {
 function eksporterCsv() {
   const liste = filtreretListe();
   if (liste.length === 0) { visBesked("Der er ingen rækker at eksportere med de valgte filtre.", "fejl"); return; }
-  const kol = ["Afdeling","Virksomhed","Region","Land","By","Adresse","Postnummer","Website","Sidst bekræftet","Latitude","Longitude"];
+  const kol = ["Afdeling","Virksomhed","Medlemstype","Afdelingstype","Region","Land","By","Adresse","Postnummer","Website","Sidst bekræftet","Latitude","Longitude"];
   const raekker = liste.map(function (r) {
     return [
-      F(r, "navn"), F(r, "brand"), regionForLand(F(r, "land")), F(r, "land"),
-      F(r, "by"), F(r, "adresse"), F(r, "postnr"), F(r, "website"),
-      bekraeftStatus(r).harDato ? bekraeftStatus(r).tekst : "",
-      F(r, "lat"), F(r, "lon")
+      F(r, "navn"), F(r, "brand"), medlemstypeForAfd(r) || "", F(r, "afdelingstype") || "",
+      regionForLand(F(r, "land")), F(r, "land"), F(r, "by"), F(r, "adresse"), F(r, "postnr"),
+      F(r, "website"), bekraeftStatus(r).harDato ? bekraeftStatus(r).tekst : "", F(r, "lat"), F(r, "lon")
     ];
   });
-  const q = function (v) {
-    const s = (v == null ? "" : String(v)).replace(/"/g, '""');
-    return '"' + s + '"';
-  };
-  const linjer = [kol.map(q).join(";")].concat(
-    raekker.map(function (row) { return row.map(q).join(";"); })
-  );
+  const q = function (v) { return '"' + (v == null ? "" : String(v)).replace(/"/g, '""') + '"'; };
+  const linjer = [kol.map(q).join(";")].concat(raekker.map(function (row) { return row.map(q).join(";"); }));
   const csv = "\uFEFF" + linjer.join("\r\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url;
-  a.download = "afdelinger_" + idagISO() + ".csv";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  a.href = url; a.download = "afdelinger_" + idagISO() + ".csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
 function opsaetOversigt() {
   udfyldFiltre();
-  ["fVirksomhed", "fRegion", "fLand"].forEach(function (id) {
-    $(id).addEventListener("change", tegnTabel);
-  });
+  opsaetMedlemstypeMultiselect();
+  ["fVirksomhed", "fRegion", "fLand"].forEach(function (id) { $(id).addEventListener("change", tegnTabel); });
   $("fSoeg").addEventListener("input", tegnTabel);
   $("fForael").addEventListener("change", tegnTabel);
   $("fNulstil").addEventListener("click", function () {
-    $("fVirksomhed").value = ""; $("fRegion").value = "";
-    $("fLand").value = ""; $("fSoeg").value = ""; $("fForael").checked = false;
-    tegnTabel();
+    $("fVirksomhed").value = ""; $("fRegion").value = ""; $("fLand").value = "";
+    $("fSoeg").value = ""; $("fForael").checked = false;
+    Array.prototype.forEach.call(document.querySelectorAll(".mtype"), function (c) { c.checked = true; });
+    opdaterMsSummary(); tegnTabel();
   });
   $("fEksport").addEventListener("click", eksporterCsv);
 
   if (ctx.entity === "Accounts" && ctx.kontoNavn) {
     const options = $("fVirksomhed").options;
     for (let i = 0; i < options.length; i++) {
-      if (options[i].value.length >= 3
-          && ctx.kontoNavn.toLowerCase().indexOf(options[i].value.toLowerCase()) !== -1) {
+      if (options[i].value.length >= 3 && ctx.kontoNavn.toLowerCase().indexOf(options[i].value.toLowerCase()) !== -1) {
         $("fVirksomhed").value = options[i].value; break;
       }
     }
@@ -709,32 +739,32 @@ function opsaetOversigt() {
    ===================================================================== */
 function opsaetOpret() {
   const sel = $("oMedlem");
-  // Ryd evt. gamle options (behold pladsholderen)
   while (sel.options.length > 1) sel.remove(1);
   alleKonti.forEach(function (k) {
     const o = document.createElement("option");
     o.value = k.id; o.textContent = k.navn;
     sel.appendChild(o);
   });
-
   if (alleKonti.length === 0) {
     visBesked("Der blev ikke fundet nogen medlemmer. Tjek at API-navnet for medlemstype "
-      + "(\u201E" + CONFIG.konto.medlemstypeFelt + "\u201C) er korrekt i CONFIG, "
-      + "eller at medlemstyperne matcher. Send besked i chatten, så retter vi det.", "fejl");
+      + "(\u201E" + CONFIG.konto.medlemstypeFelt + "\u201C) er korrekt i CONFIG. Send besked i chatten.", "fejl");
+  }
+  if (ctx.entity === "Accounts" && ctx.kontoId
+      && alleKonti.some(function (k) { return String(k.id) === String(ctx.kontoId); })) {
+    sel.value = ctx.kontoId;
   }
 
-  // Forudvælg medlem, hvis vi står på en medlemskonto
-  if (ctx.entity === "Accounts" && ctx.kontoId) {
-    const findes = alleKonti.some(function (k) { return String(k.id) === String(ctx.kontoId); });
-    if (findes) sel.value = ctx.kontoId;
-  }
+  // Afdelingstype-dropdown
+  const typeSel = $("oType");
+  while (typeSel.options.length > 1) typeSel.remove(1);
+  CONFIG.afdelingstypeVaerdier.forEach(function (t) {
+    const o = document.createElement("option"); o.value = t; o.textContent = t; typeSel.appendChild(o);
+  });
 
   const dl = $("landeliste");
   Array.from(new Set(alleRecords.map(function (r) { return F(r, "land"); }).filter(Boolean)))
     .sort(function (a, b) { return a.localeCompare(b, "da"); })
-    .forEach(function (l) {
-      const o = document.createElement("option"); o.value = l; dl.appendChild(o);
-    });
+    .forEach(function (l) { const o = document.createElement("option"); o.value = l; dl.appendChild(o); });
 
   $("oGem").addEventListener("click", gemAfdeling);
   $("oRyd").addEventListener("click", rydFelter);
@@ -742,21 +772,20 @@ function opsaetOpret() {
 
 function rydFelter() {
   ["oNavn", "oAdresse", "oPostnr", "oBy", "oLand", "oWebsite"].forEach(function (id) { $(id).value = ""; });
+  $("oType").value = "";
   const paaMedlemsside = ctx.entity === "Accounts" && ctx.kontoId
     && alleKonti.some(function (k) { return String(k.id) === String(ctx.kontoId); });
   if (!paaMedlemsside) $("oMedlem").value = "";
   skjulFejl();
 }
-function skjulFejl() {
-  ["eNavn", "eMedlem", "eAdresse", "ePostnr", "eBy", "eLand"].forEach(function (id) { $(id).hidden = true; });
-}
+function skjulFejl() { ["eNavn", "eMedlem", "eAdresse", "ePostnr", "eBy", "eLand"].forEach(function (id) { $(id).hidden = true; }); }
 
 function gemAfdeling() {
-  skjulFejl();
-  skjulBesked();
+  skjulFejl(); skjulBesked();
   const v = {
     navn:    $("oNavn").value.trim(),
     medlem:  $("oMedlem").value,
+    type:    $("oType").value,
     adresse: $("oAdresse").value.trim(),
     postnr:  $("oPostnr").value.trim(),
     by:      $("oBy").value.trim(),
@@ -764,69 +793,47 @@ function gemAfdeling() {
     website: $("oWebsite").value.trim()
   };
   let ok = true;
-  const krav = [["navn","eNavn"],["medlem","eMedlem"],["adresse","eAdresse"],
-                ["postnr","ePostnr"],["by","eBy"],["land","eLand"]];
-  krav.forEach(function (par) {
-    if (!v[par[0]]) { $(par[1]).hidden = false; ok = false; }
-  });
+  [["navn","eNavn"],["medlem","eMedlem"],["adresse","eAdresse"],["postnr","ePostnr"],["by","eBy"],["land","eLand"]]
+    .forEach(function (par) { if (!v[par[0]]) { $(par[1]).hidden = false; ok = false; } });
   if (!ok) { visBesked("Udfyld alle påkrævede felter (markeret med rødt).", "fejl"); return; }
 
-  // Sikkerhed: valgt medlem SKAL være i medlemslisten
   const konto = alleKonti.filter(function (k) { return String(k.id) === String(v.medlem); })[0];
-  if (!konto) {
-    $("eMedlem").hidden = false;
-    visBesked("Det valgte medlem er ikke gyldigt. Vælg et medlem fra listen.", "fejl");
-    return;
-  }
-  const brandNavn = konto.navn;
+  if (!konto) { $("eMedlem").hidden = false; visBesked("Vælg et gyldigt medlem fra listen.", "fejl"); return; }
 
   const data = {};
   data[CONFIG.felter.navn]    = v.navn;
   data[CONFIG.felter.medlem]  = { id: v.medlem };
-  data[CONFIG.felter.brand]   = brandNavn;
+  data[CONFIG.felter.brand]   = konto.navn;
   data[CONFIG.felter.adresse] = v.adresse;
   data[CONFIG.felter.postnr]  = v.postnr;
   data[CONFIG.felter.by]      = v.by;
   data[CONFIG.felter.land]    = v.land;
   data[CONFIG.felter.bekraeftet] = idagISO();
+  if (v.type) data[CONFIG.felter.afdelingstype] = v.type;
   if (v.website) data[CONFIG.felter.website] = v.website;
 
   $("oGem").disabled = true;
   visBesked("Gemmer afdeling og henter koordinater …");
-
-  ZOHO.CRM.API.insertRecord({
-    Entity: CONFIG.modul, APIData: data, Trigger: ["workflow"]
-  }).then(function (svar) {
-    $("oGem").disabled = false;
-    const r = svar && svar.data && svar.data[0];
-    if (r && r.code === "SUCCESS") {
-      visBesked("✔ Afdelingen \u201E" + v.navn + "\u201C er oprettet. "
-        + "Koordinaterne udfyldes automatisk inden for få sekunder.", "ok");
-      genindlaesData().then(function () {
-        rydFelter();
-        skiftFane("oversigt");
-      });
-    } else {
-      visBesked("Kunne ikke gemme: " + (r && r.message ? r.message : "ukendt fejl."), "fejl");
-      console.error("insertRecord svar:", svar);
-    }
-  }).catch(function (fejl) {
-    $("oGem").disabled = false;
-    visFejl(fejl);
-  });
+  ZOHO.CRM.API.insertRecord({ Entity: CONFIG.modul, APIData: data, Trigger: ["workflow"] })
+    .then(function (svar) {
+      $("oGem").disabled = false;
+      const r = svar && svar.data && svar.data[0];
+      if (r && r.code === "SUCCESS") {
+        visBesked("✔ Afdelingen \u201E" + v.navn + "\u201C er oprettet. Koordinaterne udfyldes automatisk inden for få sekunder.", "ok");
+        genindlaesData().then(function () { rydFelter(); skiftFane("oversigt"); });
+      } else {
+        visBesked("Kunne ikke gemme: " + (r && r.message ? r.message : "ukendt fejl."), "fejl");
+        console.error("insertRecord svar:", svar);
+      }
+    }).catch(function (fejl) { $("oGem").disabled = false; visFejl(fejl); });
 }
 
 async function genindlaesData() {
-  try {
-    alleRecords = await hentAlleAfdelinger();
-    genopbygFiltre();
-    tegnTabel();
-  } catch (e) { console.warn("Kunne ikke genindlæse:", e); }
+  try { alleRecords = await hentAlleAfdelinger(); genopbygFiltre(); tegnTabel(); }
+  catch (e) { console.warn("Kunne ikke genindlæse:", e); }
 }
 
-/* =====================================================================
-   FANESKIFT
-   ===================================================================== */
+/* ---------- faneskift ---------- */
 function skiftFane(navn) {
   const erOversigt = navn === "oversigt";
   $("visOversigt").hidden = !erOversigt;
@@ -835,9 +842,7 @@ function skiftFane(navn) {
   $("faneOpret").classList.toggle("aktiv", !erOversigt);
 }
 
-/* =====================================================================
-   OPSTART
-   ===================================================================== */
+/* ---------- opstart ---------- */
 async function vedPageLoad(data) {
   if (startTimeout) { clearTimeout(startTimeout); startTimeout = null; }
   try {
@@ -850,7 +855,8 @@ async function vedPageLoad(data) {
 
     const resultater = await Promise.all([hentAlleAfdelinger(), hentAlleKonti()]);
     alleRecords = resultater[0];
-    alleKonti = resultater[1];
+    alleKonti = resultater[1].medlemmer;
+    kontoMap = resultater[1].map;
 
     if (entitet === "Accounts" && id) {
       try {
@@ -858,18 +864,20 @@ async function vedPageLoad(data) {
         if (k && k.data && k.data[0]) ctx.kontoNavn = k.data[0].Account_Name || "";
       } catch (e) { console.warn("Kunne ikke hente kontonavn:", e); }
     }
-
     skjulBesked();
     opsaetOversigt();
     opsaetOpret();
-  } catch (fejl) {
-    visFejl(fejl);
-  }
+  } catch (fejl) { visFejl(fejl); }
 }
 
 document.addEventListener("DOMContentLoaded", function () {
   $("faneOversigt").addEventListener("click", function () { skiftFane("oversigt"); });
   $("faneOpret").addEventListener("click", function () { skiftFane("opret"); });
+  // Luk multiselect ved klik udenfor
+  document.addEventListener("click", function (e) {
+    const ms = $("msMedlemstype");
+    if (ms && ms.open && !ms.contains(e.target)) ms.open = false;
+  });
 
   if (!window.ZOHO || !ZOHO.embeddedApp) {
     visBesked("Zoho-SDK'et kunne ikke indlæses. Siden skal åbnes inde fra Zoho CRM.", "fejl");
