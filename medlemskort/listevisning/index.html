@@ -157,7 +157,7 @@
       <div class="felt">
         <label>Medlem (virksomhed) <span class="paakraevet">*</span></label>
         <select id="oMedlem"><option value="">Vælg medlem …</option></select>
-        <div class="hjaelp">Vælg den medlemskonto, afdelingen hører under. Kan ikke stå tom.</div>
+        <div class="hjaelp">Kun aktive medlemmer kan vælges – rene kontakter vises ikke.</div>
         <div class="fejltekst" id="eMedlem" hidden>Vælg et medlem.</div>
       </div>
 
@@ -225,11 +225,36 @@ const CONFIG = {
     lat:       "Latitude",
     lon:       "Longitude",
     geonoegle: "Geokodningsnoegle",
-    bekraeftet:"Sidst_bekraeftet"   // NYT: Date-felt i CRM (se guiden nederst)
+    bekraeftet:"Sidst_bekraeftet"   // Date-felt i CRM
   },
   // Hvor gammel må en bekræftelse være, før den bliver rød? (dage)
-  bekraeftGraenseDage: 365
+  bekraeftGraenseDage: 365,
+
+  /* -------------------------------------------------------------------
+     MEDLEMMER — hvem må man tildele afdelinger til?
+     Kun konti med en af nedenstående medlemstyper vises i dropdownen,
+     så man ikke kan oprette afdelinger under rene kontakter.
+     ------------------------------------------------------------------- */
+  konto: {
+    navnFelt:        "Account_Name",   // primærfeltets API-navn på Accounts
+    medlemstypeFelt: "Medlemstype",    // API-navnet på medlemstype-feltet — VERIFICÉR i CRM
+    // Alle medlemstyper i CRM (til reference):
+    //   "DI - Ordinær", "Associeret", "Iværksættermedlem", "Støttemedlem"
+    // Støttemedlem er udeladt, jf. beslutningen om at støttemedlemmer
+    // ikke indgår i afdelingskortet. Vil du inkludere dem, så tilføj
+    // "Støttemedlem" til listen herunder.
+    gyldigeMedlemstyper: ["DI - Ordinær", "Associeret", "Iværksættermedlem"]
+  }
 };
+
+/* Er en kontos medlemstype gyldig? (robust: trimmer + ignorerer store/små bogstaver) */
+function erMedlem(medlemstype) {
+  if (!medlemstype) return false;
+  const t = String(medlemstype).trim().toLowerCase();
+  return CONFIG.konto.gyldigeMedlemstyper.some(function (g) {
+    return g.trim().toLowerCase() === t;
+  });
+}
 
 /* ---------------------------------------------------------------------
    REGIONER — Land -> region. Lande der ikke står her, får "Øvrige".
@@ -297,7 +322,7 @@ function bekraeftStatus(rec) {
 
 /* ===================================================================== */
 let alleRecords = [];
-let alleKonti = [];
+let alleKonti = [];   // KUN medlemmer (filtreret på medlemstype)
 const ctx = { entity: null, kontoId: null, kontoNavn: "" };
 let startTimeout = null;
 let redigererId = null;
@@ -337,17 +362,24 @@ async function hentAlleAfdelinger() {
   return ud;
 }
 async function hentAlleKonti() {
-  let side = 1, ud = [];
+  let side = 1, ud = [], ialt = 0;
   while (side <= 25) {
     const svar = await ZOHO.CRM.API.getAllRecords({
       Entity: "Accounts", sort_order: "asc", per_page: 200, page: side
     });
     const data = (svar && svar.data) ? svar.data : [];
-    data.forEach(function (k) { ud.push({ id: k.id, navn: k.Account_Name || "" }); });
+    data.forEach(function (k) {
+      ialt++;
+      const type = k[CONFIG.konto.medlemstypeFelt];
+      if (erMedlem(type)) {
+        ud.push({ id: k.id, navn: k[CONFIG.konto.navnFelt] || "", type: type });
+      }
+    });
     if (data.length < 200) break;
     side++;
   }
   ud.sort(function (a, b) { return a.navn.localeCompare(b.navn, "da"); });
+  console.log("Konti hentet:", ialt, "– heraf medlemmer:", ud.length);
   return ud;
 }
 function recordById(id) {
@@ -497,7 +529,6 @@ function genbekraeft(id) {
   const data = {};
   data[CONFIG.felter.bekraeftet] = idag;
   skjulBesked();
-  // Trigger:[] så ingen workflows (fx geokodning) rører posten
   ZOHO.CRM.API.updateRecord({
     Entity: CONFIG.modul, RecordID: id, APIData: data, Trigger: []
   }).then(function (svar) {
@@ -534,7 +565,6 @@ function gemRedigering(id, tr) {
   data[CONFIG.felter.by]      = nye.by;
   data[CONFIG.felter.adresse] = nye.adresse;
   data[CONFIG.felter.postnr]  = nye.postnr;
-  // En rettelse tæller som en bekræftelse af, at data er aktuelle
   const idag = idagISO();
   data[CONFIG.felter.bekraeftet] = idag;
 
@@ -679,14 +709,26 @@ function opsaetOversigt() {
    ===================================================================== */
 function opsaetOpret() {
   const sel = $("oMedlem");
+  // Ryd evt. gamle options (behold pladsholderen)
+  while (sel.options.length > 1) sel.remove(1);
   alleKonti.forEach(function (k) {
     const o = document.createElement("option");
     o.value = k.id; o.textContent = k.navn;
     sel.appendChild(o);
   });
-  if (ctx.entity === "Accounts" && ctx.kontoId) {
-    sel.value = ctx.kontoId;
+
+  if (alleKonti.length === 0) {
+    visBesked("Der blev ikke fundet nogen medlemmer. Tjek at API-navnet for medlemstype "
+      + "(\u201E" + CONFIG.konto.medlemstypeFelt + "\u201C) er korrekt i CONFIG, "
+      + "eller at medlemstyperne matcher. Send besked i chatten, så retter vi det.", "fejl");
   }
+
+  // Forudvælg medlem, hvis vi står på en medlemskonto
+  if (ctx.entity === "Accounts" && ctx.kontoId) {
+    const findes = alleKonti.some(function (k) { return String(k.id) === String(ctx.kontoId); });
+    if (findes) sel.value = ctx.kontoId;
+  }
+
   const dl = $("landeliste");
   Array.from(new Set(alleRecords.map(function (r) { return F(r, "land"); }).filter(Boolean)))
     .sort(function (a, b) { return a.localeCompare(b, "da"); })
@@ -700,7 +742,9 @@ function opsaetOpret() {
 
 function rydFelter() {
   ["oNavn", "oAdresse", "oPostnr", "oBy", "oLand", "oWebsite"].forEach(function (id) { $(id).value = ""; });
-  if (!(ctx.entity === "Accounts" && ctx.kontoId)) $("oMedlem").value = "";
+  const paaMedlemsside = ctx.entity === "Accounts" && ctx.kontoId
+    && alleKonti.some(function (k) { return String(k.id) === String(ctx.kontoId); });
+  if (!paaMedlemsside) $("oMedlem").value = "";
   skjulFejl();
 }
 function skjulFejl() {
@@ -727,8 +771,14 @@ function gemAfdeling() {
   });
   if (!ok) { visBesked("Udfyld alle påkrævede felter (markeret med rødt).", "fejl"); return; }
 
+  // Sikkerhed: valgt medlem SKAL være i medlemslisten
   const konto = alleKonti.filter(function (k) { return String(k.id) === String(v.medlem); })[0];
-  const brandNavn = konto ? konto.navn : "";
+  if (!konto) {
+    $("eMedlem").hidden = false;
+    visBesked("Det valgte medlem er ikke gyldigt. Vælg et medlem fra listen.", "fejl");
+    return;
+  }
+  const brandNavn = konto.navn;
 
   const data = {};
   data[CONFIG.felter.navn]    = v.navn;
@@ -738,7 +788,7 @@ function gemAfdeling() {
   data[CONFIG.felter.postnr]  = v.postnr;
   data[CONFIG.felter.by]      = v.by;
   data[CONFIG.felter.land]    = v.land;
-  data[CONFIG.felter.bekraeftet] = idagISO();   // ny afdeling = bekræftet i dag
+  data[CONFIG.felter.bekraeftet] = idagISO();
   if (v.website) data[CONFIG.felter.website] = v.website;
 
   $("oGem").disabled = true;
