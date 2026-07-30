@@ -141,7 +141,11 @@ function esc(s) {
   });
 }
 function F(rec, noegle) { return rec[CONFIG.felter[noegle]]; }
-function erHovedkontor(r) { return F(r, "afdelingstype") === CONFIG.hovedkontorType; }
+function erHovedkontor(r) {
+  const t = F(r, "afdelingstype");
+  if (!t) return false;
+  return String(t).trim().toLowerCase() === CONFIG.hovedkontorType.trim().toLowerCase();
+}
 function visBesked(tekst, erFejl) {
   const b = $("besked"); b.textContent = tekst; b.classList.toggle("fejl", !!erFejl); b.hidden = false;
 }
