@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Afdelinger – oversigt & opret</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column;
+         font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+         color: #1c1c1c; background: #fff; }
+
+  /* Faner */
+  .faner { display: flex; gap: 4px; padding: 8px 10px 0; background: #fafafa;
+           border-bottom: 1px solid #e3e3e3; }
+  .fane { padding: 8px 16px; border: 1px solid #e3e3e3; border-bottom: none;
+          border-radius: 8px 8px 0 0; background: #f0f0f0; cursor: pointer;
+          font-size: 13.5px; color: #444; }
+  .fane.aktiv { background: #fff; color: #1a56a0; font-weight: 600;
+                margin-bottom: -1px; }
+
+  /* Filterbjælke */
+  .top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+         padding: 10px; border-bottom: 1px solid #e3e3e3; background: #fafafa; }
+  .top select, .top input {
+         padding: 6px 8px; border: 1px solid #c9c9c9; border-radius: 6px;
+         font-size: 13px; background: #fff; }
+  .top input[type=text] { min-width: 200px; }
+  .top button, .knap { padding: 6px 12px; border: 1px solid #c9c9c9;
+         border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; }
+  .top button:hover, .knap:hover { background: #f0f0f0; }
+  .knap-primaer { background: #1a56a0; border-color: #1a56a0; color: #fff; }
+  .knap-primaer:hover { background: #16487f; }
+  .knap-lille { padding: 3px 8px; font-size: 12px; border: 1px solid #c9c9c9;
+         border-radius: 5px; background: #fff; cursor: pointer; white-space: nowrap; }
+  .knap-lille:hover { background: #f0f0f0; }
+  .knap-slet { color: #a01a1a; border-color: #e2b6b6; }
+  .knap-slet:hover { background: #fdecec; }
+  .knap-gem { color: #fff; background: #1a56a0; border-color: #1a56a0; }
+  .knap-gem:hover { background: #16487f; }
+  .knap-bekraeft { color: #1c6b2c; border-color: #bfe0c6; }
+  .knap-bekraeft:hover { background: #e9f7ec; }
+  #taeller { font-size: 12.5px; color: #555; margin-left: auto; }
+  #kunForael { font-size: 12.5px; color: #555; display: flex; align-items: center; gap: 5px; }
+
+  /* Tabel */
+  .tabelboks { flex: 1; overflow: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  thead th { position: sticky; top: 0; background: #f4f6f9; text-align: left;
+             padding: 8px 10px; border-bottom: 2px solid #e3e3e3; z-index: 1;
+             white-space: nowrap; }
+  tbody td { padding: 6px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tbody tr:hover { background: #f7fbff; }
+  tbody tr.redigerer { background: #fffbe9; }
+  td a { color: #1a56a0; text-decoration: none; }
+  td a:hover { text-decoration: underline; }
+  td.handling { white-space: nowrap; }
+  td.handling .knap-lille { margin-right: 4px; }
+  td input.celle { width: 100%; box-sizing: border-box; padding: 4px 6px;
+             border: 1px solid #9fb6d4; border-radius: 5px; font-size: 13px;
+             font-family: inherit; }
+  .bekraeft-celle { white-space: nowrap; }
+  .bekraeft-dato { font-variant-numeric: tabular-nums; }
+  .bekraeft-dato.foraeldet { color: #c0392b; font-weight: 600; }
+  .bekraeft-badge { display: inline-block; margin-left: 6px; font-size: 11px;
+             padding: 1px 6px; border-radius: 10px; background: #fdecec;
+             color: #a01a1a; border: 1px solid #f2c4c4; }
+  .tom { padding: 24px; text-align: center; color: #777; }
+
+  /* Beskeder */
+  .besked { padding: 12px 14px; font-size: 14px; background: #fff7e6;
+            color: #7a4b00; border-bottom: 1px solid #f0dcb4; }
+  .besked.fejl { background: #fdecec; color: #8a1f1f; border-color: #f2c4c4; }
+  .besked.ok  { background: #e9f7ec; color: #1c6b2c; border-color: #c3e6cb; }
+
+  /* Formular */
+  .formboks { flex: 1; overflow: auto; padding: 18px 20px; }
+  .form { max-width: 560px; }
+  .felt { margin-bottom: 14px; }
+  .felt label { display: block; font-size: 13px; font-weight: 600;
+                margin-bottom: 4px; }
+  .felt .paakraevet { color: #c0392b; }
+  .felt input, .felt select, .felt textarea {
+        width: 100%; box-sizing: border-box; padding: 8px 10px;
+        border: 1px solid #c9c9c9; border-radius: 6px; font-size: 14px;
+        background: #fff; font-family: inherit; }
+  .felt input:focus, .felt select:focus { outline: 2px solid #1a56a0; }
+  .hjaelp { font-size: 12px; color: #666; margin-top: 3px; }
+  .info-geo { background: #eef4fb; border: 1px solid #cfe0f3; color: #234;
+              padding: 10px 12px; border-radius: 8px; font-size: 13px;
+              margin-bottom: 16px; }
+  .fejltekst { color: #c0392b; font-size: 12px; margin-top: 3px; }
+  .formknapper { display: flex; gap: 10px; margin-top: 6px; }
+
+  .bund { padding: 6px 10px; font-size: 12px; color: #666;
+          border-top: 1px solid #e3e3e3; background: #fafafa; }
+</style>
+</head>
+<body>
+
+<div class="faner">
+  <div class="fane aktiv" id="faneOversigt">📋 Oversigt</div>
+  <div class="fane" id="faneOpret">➕ Tilføj afdeling</div>
+</div>
+
+<div class="besked" id="besked" hidden></div>
+
+<!-- ============ OVERSIGT ============ -->
+<div id="visOversigt">
+  <div class="top">
+    <select id="fVirksomhed"><option value="">Alle virksomheder</option></select>
+    <select id="fRegion"><option value="">Alle regioner</option></select>
+    <select id="fLand"><option value="">Alle lande</option></select>
+    <input id="fSoeg" type="text" placeholder="Søg afdeling, by eller adresse …">
+    <label id="kunForael"><input type="checkbox" id="fForael"> Kun forældede</label>
+    <button id="fNulstil" type="button">Nulstil</button>
+    <button id="fEksport" type="button" class="knap-primaer">⬇ Eksportér visning (CSV)</button>
+    <span id="taeller"></span>
+  </div>
+  <div class="tabelboks">
+    <table>
+      <thead>
+        <tr>
+          <th>Afdeling</th>
+          <th>Virksomhed</th>
+          <th>Region</th>
+          <th>Land</th>
+          <th>By</th>
+          <th>Adresse</th>
+          <th>Postnr.</th>
+          <th>Sidst bekræftet</th>
+          <th>Handlinger</th>
+        </tr>
+      </thead>
+      <tbody id="tabelKrop"></tbody>
+    </table>
+    <div class="tom" id="tomBesked" hidden>Ingen afdelinger matcher de valgte filtre.</div>
+  </div>
+</div>
+
+<!-- ============ OPRET ============ -->
+<div id="visOpret" hidden>
+  <div class="formboks">
+    <div class="form">
+      <div class="info-geo">
+        📍 <strong>Koordinater findes automatisk.</strong> Du skal ikke taste
+        breddegrad/længdegrad. Når du gemmer, slår systemet <em>By + Land</em> op
+        og udfylder placeringen på kortet inden for få sekunder.
+      </div>
+
+      <div class="felt">
+        <label>Afdelingsnavn <span class="paakraevet">*</span></label>
+        <input id="oNavn" type="text" placeholder="fx PrimeServ Holeby">
+        <div class="fejltekst" id="eNavn" hidden>Udfyld afdelingsnavn.</div>
+      </div>
+
+      <div class="felt">
+        <label>Medlem (virksomhed) <span class="paakraevet">*</span></label>
+        <select id="oMedlem"><option value="">Vælg medlem …</option></select>
+        <div class="hjaelp">Vælg den medlemskonto, afdelingen hører under. Kan ikke stå tom.</div>
+        <div class="fejltekst" id="eMedlem" hidden>Vælg et medlem.</div>
+      </div>
+
+      <div class="felt">
+        <label>Adresse <span class="paakraevet">*</span></label>
+        <input id="oAdresse" type="text" placeholder="Gade og husnummer">
+        <div class="fejltekst" id="eAdresse" hidden>Udfyld adresse.</div>
+      </div>
+
+      <div class="felt">
+        <label>Postnummer <span class="paakraevet">*</span></label>
+        <input id="oPostnr" type="text" placeholder="fx 4960">
+        <div class="fejltekst" id="ePostnr" hidden>Udfyld postnummer.</div>
+      </div>
+
+      <div class="felt">
+        <label>By <span class="paakraevet">*</span></label>
+        <input id="oBy" type="text" placeholder="fx Holeby">
+        <div class="hjaelp">Bruges til den automatiske geokodning – skriv den korrekt.</div>
+        <div class="fejltekst" id="eBy" hidden>Udfyld by.</div>
+      </div>
+
+      <div class="felt">
+        <label>Land <span class="paakraevet">*</span></label>
+        <input id="oLand" type="text" list="landeliste" placeholder="fx Danmark">
+        <datalist id="landeliste"></datalist>
+        <div class="hjaelp">Vælg fra listen eller skriv et nyt land (dansk stavemåde).</div>
+        <div class="fejltekst" id="eLand" hidden>Udfyld land.</div>
+      </div>
+
+      <div class="felt">
+        <label>Website <span style="font-weight:400;color:#888;">(valgfrit)</span></label>
+        <input id="oWebsite" type="text" placeholder="https://…">
+      </div>
+
+      <div class="formknapper">
+        <button id="oGem" type="button" class="knap knap-primaer">Gem afdeling</button>
+        <button id="oRyd" type="button" class="knap">Ryd felter</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="bund" id="bund" hidden></div>
+
+<!-- Zoho SDK skal indlæses FØR vores egen kode -->
+<script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
+<script id="hovedscript">
+"use strict";
+/* =====================================================================
+   KONFIGURATION
+   Skal matche API-navnene i CRM. Skal noget omdøbes, rettes det KUN her.
+   ===================================================================== */
+const CONFIG = {
+  modul: "Afdelinger",
+  felter: {
+    navn:      "Name",
+    medlem:    "Medlem",
+    brand:     "Brand",
+    land:      "Land",
+    adresse:   "Adresse",
+    postnr:    "Postnummer",
+    by:        "By",
+    website:   "Website",
+    lat:       "Latitude",
+    lon:       "Longitude",
+    geonoegle: "Geokodningsnoegle",
+    bekraeftet:"Sidst_bekraeftet"   // NYT: Date-felt i CRM (se guiden nederst)
+  },
+  // Hvor gammel må en bekræftelse være, før den bliver rød? (dage)
+  bekraeftGraenseDage: 365
+};
+
+/* ---------------------------------------------------------------------
+   REGIONER — Land -> region. Lande der ikke står her, får "Øvrige".
+   --------------------------------------------------------------------- */
+const REGIONER = {
+  "Norden": ["Danmark","Færøerne","Grønland","Island","Norge","Sverige","Finland","Åland"],
+  "Vesteuropa": ["Tyskland","Nederlandene","Holland","Belgien","Frankrig","Storbritannien",
+    "Storbritanien","England","Skotland","Irland","Luxembourg","Østrig","Schweiz",
+    "Liechtenstein","Monaco"],
+  "Sydeuropa": ["Spanien","Portugal","Italien","Grækenland","Malta","Cypern","Kroatien",
+    "Slovenien","San Marino","Andorra","Gibraltar"],
+  "Østeuropa": ["Polen","Tjekkiet","Slovakiet","Ungarn","Rumænien","Bulgarien","Estland",
+    "Letland","Litauen","Ukraine","Hviderusland","Belarus","Rusland","Serbien",
+    "Bosnien-Hercegovina","Montenegro","Nordmakedonien","Makedonien","Albanien","Moldova",
+    "Georgien","Armenien","Aserbajdsjan","Kosovo"],
+  "Nordamerika": ["USA","Amerikas Forenede Stater","Canada"],
+  "Latinamerika": ["Mexico","Brasilien","Argentina","Chile","Peru","Colombia","Venezuela",
+    "Ecuador","Uruguay","Paraguay","Bolivia","Panama","Costa Rica","Guatemala","Honduras",
+    "Nicaragua","El Salvador","Cuba","Den Dominikanske Republik","Trinidad og Tobago",
+    "Jamaica","Bahamas","Puerto Rico"],
+  "Mellemøsten": ["De Forenede Arabiske Emirater","Forenede Arabiske Emirater","Emiraterne",
+    "Saudi-Arabien","Qatar","Kuwait","Bahrain","Oman","Yemen","Irak","Iran","Israel",
+    "Jordan","Libanon","Syrien","Tyrkiet"],
+  "Afrika": ["Sydafrika","Egypten","Marokko","Algeriet","Tunesien","Libyen","Nigeria",
+    "Ghana","Kenya","Tanzania","Angola","Namibia","Mozambique","Senegal","Elfenbenskysten",
+    "Congo","DR Congo","Den Demokratiske Republik Congo","Cameroun","Etiopien","Sudan",
+    "Djibouti","Mauritius","Togo","Gabon","Ækvatorialguinea","Liberia","Guinea"],
+  "Sydasien": ["Indien","Pakistan","Bangladesh","Sri Lanka","Nepal","Maldiverne","Bhutan"],
+  "Østasien": ["Kina","Japan","Sydkorea","Nordkorea","Taiwan","Hongkong","Hong Kong",
+    "Macao","Mongoliet"],
+  "Sydøstasien": ["Singapore","Malaysia","Indonesien","Thailand","Vietnam","Filippinerne",
+    "Myanmar","Cambodja","Laos","Brunei","Østtimor"],
+  "Centralasien": ["Kasakhstan","Usbekistan","Turkmenistan","Kirgisistan","Tadsjikistan",
+    "Afghanistan"],
+  "Oceanien": ["Australien","New Zealand","Papua Ny Guinea","Fiji","Ny Kaledonien"]
+};
+const LAND_TIL_REGION = {};
+Object.keys(REGIONER).forEach(function (region) {
+  REGIONER[region].forEach(function (land) {
+    LAND_TIL_REGION[land.toLowerCase()] = region;
+  });
+});
+function regionForLand(land) {
+  if (!land) return "Ukendt";
+  const r = LAND_TIL_REGION[String(land).trim().toLowerCase()];
+  return r || "Øvrige";
+}
+
+/* ---------------------------------------------------------------------
+   BEKRÆFTELSES-STATUS
+   --------------------------------------------------------------------- */
+function toCifre(n) { return (n < 10 ? "0" : "") + n; }
+function datoISO(d) {
+  return d.getFullYear() + "-" + toCifre(d.getMonth() + 1) + "-" + toCifre(d.getDate());
+}
+function idagISO() { return datoISO(new Date()); }
+function bekraeftStatus(rec) {
+  const raa = F(rec, "bekraeftet");
+  if (!raa) return { harDato: false, foraeldet: true, tekst: "Aldrig" };
+  const d = new Date(raa);
+  if (isNaN(d.getTime())) return { harDato: false, foraeldet: true, tekst: String(raa) };
+  const alderDage = (Date.now() - d.getTime()) / 86400000;
+  return { harDato: true, foraeldet: alderDage > CONFIG.bekraeftGraenseDage, tekst: datoISO(d) };
+}
+
+/* ===================================================================== */
+let alleRecords = [];
+let alleKonti = [];
+const ctx = { entity: null, kontoId: null, kontoNavn: "" };
+let startTimeout = null;
+let redigererId = null;
+
+function $(id) { return document.getElementById(id); }
+function F(rec, noegle) { return rec[CONFIG.felter[noegle]]; }
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+function visBesked(tekst, type) {
+  const b = $("besked");
+  b.textContent = tekst;
+  b.className = "besked" + (type ? " " + type : "");
+  b.hidden = false;
+}
+function skjulBesked() { $("besked").hidden = true; }
+function visFejl(fejl) {
+  console.error("Afdelinger-widget fejl:", fejl);
+  visBesked("Noget gik galt. Tryk F12 → fanen Console, kopiér den røde fejltekst "
+    + "og send den i chatten – så finder vi fejlen sammen.", "fejl");
+}
+
+/* ---------- datahentning ---------- */
+async function hentAlleAfdelinger() {
+  let side = 1, ud = [];
+  while (side <= 25) {
+    const svar = await ZOHO.CRM.API.getAllRecords({
+      Entity: CONFIG.modul, sort_order: "asc", per_page: 200, page: side
+    });
+    const data = (svar && svar.data) ? svar.data : [];
+    ud = ud.concat(data);
+    if (data.length < 200) break;
+    side++;
+  }
+  return ud;
+}
+async function hentAlleKonti() {
+  let side = 1, ud = [];
+  while (side <= 25) {
+    const svar = await ZOHO.CRM.API.getAllRecords({
+      Entity: "Accounts", sort_order: "asc", per_page: 200, page: side
+    });
+    const data = (svar && svar.data) ? svar.data : [];
+    data.forEach(function (k) { ud.push({ id: k.id, navn: k.Account_Name || "" }); });
+    if (data.length < 200) break;
+    side++;
+  }
+  ud.sort(function (a, b) { return a.navn.localeCompare(b.navn, "da"); });
+  return ud;
+}
+function recordById(id) {
+  return alleRecords.filter(function (r) { return String(r.id) === String(id); })[0];
+}
+
+/* =====================================================================
+   OVERSIGT
+   ===================================================================== */
+function udfyldFiltre() {
+  const virks = Array.from(new Set(
+    alleRecords.map(function (r) { return F(r, "brand"); }).filter(Boolean)
+  )).sort(function (a, b) { return a.localeCompare(b, "da"); });
+  const lande = Array.from(new Set(
+    alleRecords.map(function (r) { return F(r, "land"); }).filter(Boolean)
+  )).sort(function (a, b) { return a.localeCompare(b, "da"); });
+  const regioner = Array.from(new Set(
+    alleRecords.map(function (r) { return regionForLand(F(r, "land")); })
+  )).sort(function (a, b) { return a.localeCompare(b, "da"); });
+
+  virks.forEach(function (v) { tilfoejOption("fVirksomhed", v); });
+  regioner.forEach(function (v) { tilfoejOption("fRegion", v); });
+  lande.forEach(function (v) { tilfoejOption("fLand", v); });
+}
+function tilfoejOption(selId, vaerdi) {
+  const o = document.createElement("option");
+  o.value = vaerdi; o.textContent = vaerdi;
+  $(selId).appendChild(o);
+}
+
+function filtreretListe() {
+  const virk   = $("fVirksomhed").value;
+  const region = $("fRegion").value;
+  const land   = $("fLand").value;
+  const soeg   = $("fSoeg").value.trim().toLowerCase();
+  const kunForael = $("fForael").checked;
+  return alleRecords.filter(function (r) {
+    if (virk && F(r, "brand") !== virk) return false;
+    if (land && F(r, "land") !== land) return false;
+    if (region && regionForLand(F(r, "land")) !== region) return false;
+    if (kunForael && !bekraeftStatus(r).foraeldet) return false;
+    if (soeg) {
+      const tekst = [F(r, "navn"), F(r, "by"), F(r, "adresse"), F(r, "brand"), F(r, "land")]
+        .filter(Boolean).join(" ").toLowerCase();
+      if (tekst.indexOf(soeg) === -1) return false;
+    }
+    return true;
+  });
+}
+
+function tegnTabel() {
+  const liste = filtreretListe();
+  const krop = $("tabelKrop");
+  krop.innerHTML = "";
+  let antalForael = 0;
+  liste.forEach(function (r) {
+    if (bekraeftStatus(r).foraeldet) antalForael++;
+    const tr = document.createElement("tr");
+    tr.setAttribute("data-id", r.id);
+    if (String(r.id) === String(redigererId)) {
+      byggRedigerRaekke(tr, r);
+    } else {
+      byggVisRaekke(tr, r);
+    }
+    krop.appendChild(tr);
+  });
+  $("tomBesked").hidden = liste.length > 0;
+  $("taeller").textContent = liste.length + " af " + alleRecords.length + " afdelinger"
+    + (antalForael ? " · " + antalForael + " forældede" : "");
+  return liste;
+}
+
+/* ---- bekræftelses-celle ---- */
+function bekraeftCelleHtml(r) {
+  const s = bekraeftStatus(r);
+  const datoKlasse = "bekraeft-dato" + (s.foraeldet ? " foraeldet" : "");
+  const badge = s.foraeldet ? '<span class="bekraeft-badge">Tjek</span>' : "";
+  return '<td class="bekraeft-celle">'
+    + '<span class="' + datoKlasse + '">' + esc(s.tekst) + "</span>" + badge
+    + '<br><button class="knap-lille knap-bekraeft" data-akt="bekraeft">✓ Genbekræft</button>'
+    + '</td>';
+}
+
+/* ---- visningsrække ---- */
+function byggVisRaekke(tr, r) {
+  tr.className = "";
+  tr.innerHTML =
+      "<td>" + esc(F(r, "navn")) + "</td>"
+    + "<td>" + esc(F(r, "brand")) + "</td>"
+    + "<td>" + esc(regionForLand(F(r, "land"))) + "</td>"
+    + "<td>" + esc(F(r, "land")) + "</td>"
+    + "<td>" + esc(F(r, "by")) + "</td>"
+    + "<td>" + esc(F(r, "adresse")) + "</td>"
+    + "<td>" + esc(F(r, "postnr")) + "</td>"
+    + bekraeftCelleHtml(r)
+    + '<td class="handling">'
+    +   '<button class="knap-lille" data-akt="ret">✏ Ret</button>'
+    +   '<button class="knap-lille knap-slet" data-akt="slet">🗑 Slet</button>'
+    +   '<button class="knap-lille" data-akt="crm">CRM ↗</button>'
+    + '</td>';
+  tr.querySelector('[data-akt="bekraeft"]').addEventListener("click", function () { genbekraeft(r.id); });
+  tr.querySelector('[data-akt="ret"]').addEventListener("click", function () { startRedigering(r.id); });
+  tr.querySelector('[data-akt="slet"]').addEventListener("click", function () { sletAfdeling(r.id); });
+  tr.querySelector('[data-akt="crm"]').addEventListener("click", function () {
+    try { ZOHO.CRM.UI.Record.open({ Entity: CONFIG.modul, RecordID: r.id }); }
+    catch (e) { console.error(e); }
+  });
+}
+
+/* ---- redigeringsrække ---- */
+function inputCelle(vaerdi) {
+  return '<td><input class="celle" value="' + esc(vaerdi) + '"></td>';
+}
+function byggRedigerRaekke(tr, r) {
+  const s = bekraeftStatus(r);
+  tr.className = "redigerer";
+  tr.innerHTML =
+      inputCelle(F(r, "navn"))                       // 0 navn
+    + inputCelle(F(r, "brand"))                      // 1 brand
+    + "<td>" + esc(regionForLand(F(r, "land"))) + "</td>" // region (auto)
+    + inputCelle(F(r, "land"))                       // 2 land
+    + inputCelle(F(r, "by"))                         // 3 by
+    + inputCelle(F(r, "adresse"))                    // 4 adresse
+    + inputCelle(F(r, "postnr"))                     // 5 postnr
+    + '<td class="bekraeft-celle"><span class="bekraeft-dato'
+        + (s.foraeldet ? " foraeldet" : "") + '">' + esc(s.tekst) + "</span></td>"
+    + '<td class="handling">'
+    +   '<button class="knap-lille knap-gem" data-akt="gem">💾 Gem</button>'
+    +   '<button class="knap-lille" data-akt="fortryd">Fortryd</button>'
+    + '</td>';
+  tr.querySelector('[data-akt="gem"]').addEventListener("click", function () { gemRedigering(r.id, tr); });
+  tr.querySelector('[data-akt="fortryd"]').addEventListener("click", function () {
+    redigererId = null; tegnTabel();
+  });
+}
+
+function startRedigering(id) {
+  redigererId = id;
+  tegnTabel();
+}
+
+/* ---- genbekræft: sæt Sidst bekræftet = i dag ---- */
+function genbekraeft(id) {
+  const r = recordById(id);
+  if (!r) return;
+  const idag = idagISO();
+  const data = {};
+  data[CONFIG.felter.bekraeftet] = idag;
+  skjulBesked();
+  // Trigger:[] så ingen workflows (fx geokodning) rører posten
+  ZOHO.CRM.API.updateRecord({
+    Entity: CONFIG.modul, RecordID: id, APIData: data, Trigger: []
+  }).then(function (svar) {
+    const res = svar && svar.data && svar.data[0];
+    if (res && res.code === "SUCCESS") {
+      r[CONFIG.felter.bekraeftet] = idag;
+      tegnTabel();
+      visBesked("✔ \u201E" + (F(r, "navn") || "Afdeling") + "\u201C bekræftet i dag (" + idag + ").", "ok");
+    } else {
+      visBesked("Kunne ikke bekræfte: " + (res && res.message ? res.message : "ukendt fejl."), "fejl");
+      console.error("updateRecord (bekræft) svar:", svar);
+    }
+  }).catch(function (fejl) { visFejl(fejl); });
+}
+
+function gemRedigering(id, tr) {
+  const r = recordById(id);
+  if (!r) return;
+  const inputs = tr.querySelectorAll("input.celle");
+  const nye = {
+    navn:    inputs[0].value.trim(),
+    brand:   inputs[1].value.trim(),
+    land:    inputs[2].value.trim(),
+    by:      inputs[3].value.trim(),
+    adresse: inputs[4].value.trim(),
+    postnr:  inputs[5].value.trim()
+  };
+  if (!nye.navn) { visBesked("Afdelingsnavn må ikke være tomt.", "fejl"); return; }
+
+  const data = {};
+  data[CONFIG.felter.navn]    = nye.navn;
+  data[CONFIG.felter.brand]   = nye.brand;
+  data[CONFIG.felter.land]    = nye.land;
+  data[CONFIG.felter.by]      = nye.by;
+  data[CONFIG.felter.adresse] = nye.adresse;
+  data[CONFIG.felter.postnr]  = nye.postnr;
+  // En rettelse tæller som en bekræftelse af, at data er aktuelle
+  const idag = idagISO();
+  data[CONFIG.felter.bekraeftet] = idag;
+
+  const byAendret   = String(F(r, "by")   || "") !== nye.by;
+  const landAendret = String(F(r, "land") || "") !== nye.land;
+  if (byAendret || landAendret) {
+    data[CONFIG.felter.lat] = null;
+    data[CONFIG.felter.lon] = null;
+    data[CONFIG.felter.geonoegle] = null;
+  }
+
+  const gemKnap = tr.querySelector('[data-akt="gem"]');
+  gemKnap.disabled = true;
+  skjulBesked();
+
+  ZOHO.CRM.API.updateRecord({
+    Entity: CONFIG.modul, RecordID: id, APIData: data, Trigger: ["workflow"]
+  }).then(function (svar) {
+    const res = svar && svar.data && svar.data[0];
+    if (res && res.code === "SUCCESS") {
+      r[CONFIG.felter.navn] = nye.navn;
+      r[CONFIG.felter.brand] = nye.brand;
+      r[CONFIG.felter.land] = nye.land;
+      r[CONFIG.felter.by] = nye.by;
+      r[CONFIG.felter.adresse] = nye.adresse;
+      r[CONFIG.felter.postnr] = nye.postnr;
+      r[CONFIG.felter.bekraeftet] = idag;
+      if (byAendret || landAendret) {
+        r[CONFIG.felter.lat] = null; r[CONFIG.felter.lon] = null;
+      }
+      redigererId = null;
+      genopbygFiltre();
+      tegnTabel();
+      visBesked("✔ \u201E" + nye.navn + "\u201C er gemt og bekræftet i dag."
+        + ((byAendret || landAendret) ? " Nye koordinater hentes automatisk om få sekunder." : ""), "ok");
+    } else {
+      gemKnap.disabled = false;
+      visBesked("Kunne ikke gemme: " + (res && res.message ? res.message : "ukendt fejl."), "fejl");
+      console.error("updateRecord svar:", svar);
+    }
+  }).catch(function (fejl) {
+    gemKnap.disabled = false;
+    visFejl(fejl);
+  });
+}
+
+function sletAfdeling(id) {
+  const r = recordById(id);
+  const navn = r ? (F(r, "navn") || "afdelingen") : "afdelingen";
+  if (!window.confirm("Slet \u201E" + navn + "\u201C permanent? Dette kan ikke fortrydes.")) return;
+  skjulBesked();
+  ZOHO.CRM.API.deleteRecord({ Entity: CONFIG.modul, RecordID: id })
+    .then(function (svar) {
+      const res = svar && svar.data && svar.data[0];
+      if (res && res.code === "SUCCESS") {
+        alleRecords = alleRecords.filter(function (x) { return String(x.id) !== String(id); });
+        if (String(redigererId) === String(id)) redigererId = null;
+        genopbygFiltre();
+        tegnTabel();
+        visBesked("🗑 \u201E" + navn + "\u201C er slettet.", "ok");
+      } else {
+        visBesked("Kunne ikke slette: " + (res && res.message ? res.message : "ukendt fejl."), "fejl");
+        console.error("deleteRecord svar:", svar);
+      }
+    })
+    .catch(function (fejl) { visFejl(fejl); });
+}
+
+function genopbygFiltre() {
+  const gemtVirk = $("fVirksomhed").value;
+  const gemtReg  = $("fRegion").value;
+  const gemtLand = $("fLand").value;
+  ["fVirksomhed", "fRegion", "fLand"].forEach(function (id) {
+    const sel = $(id);
+    while (sel.options.length > 1) sel.remove(1);
+  });
+  udfyldFiltre();
+  if ([].some.call($("fVirksomhed").options, function (o) { return o.value === gemtVirk; })) $("fVirksomhed").value = gemtVirk;
+  if ([].some.call($("fRegion").options, function (o) { return o.value === gemtReg; })) $("fRegion").value = gemtReg;
+  if ([].some.call($("fLand").options, function (o) { return o.value === gemtLand; })) $("fLand").value = gemtLand;
+}
+
+function eksporterCsv() {
+  const liste = filtreretListe();
+  if (liste.length === 0) { visBesked("Der er ingen rækker at eksportere med de valgte filtre.", "fejl"); return; }
+  const kol = ["Afdeling","Virksomhed","Region","Land","By","Adresse","Postnummer","Website","Sidst bekræftet","Latitude","Longitude"];
+  const raekker = liste.map(function (r) {
+    return [
+      F(r, "navn"), F(r, "brand"), regionForLand(F(r, "land")), F(r, "land"),
+      F(r, "by"), F(r, "adresse"), F(r, "postnr"), F(r, "website"),
+      bekraeftStatus(r).harDato ? bekraeftStatus(r).tekst : "",
+      F(r, "lat"), F(r, "lon")
+    ];
+  });
+  const q = function (v) {
+    const s = (v == null ? "" : String(v)).replace(/"/g, '""');
+    return '"' + s + '"';
+  };
+  const linjer = [kol.map(q).join(";")].concat(
+    raekker.map(function (row) { return row.map(q).join(";"); })
+  );
+  const csv = "\uFEFF" + linjer.join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "afdelinger_" + idagISO() + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function opsaetOversigt() {
+  udfyldFiltre();
+  ["fVirksomhed", "fRegion", "fLand"].forEach(function (id) {
+    $(id).addEventListener("change", tegnTabel);
+  });
+  $("fSoeg").addEventListener("input", tegnTabel);
+  $("fForael").addEventListener("change", tegnTabel);
+  $("fNulstil").addEventListener("click", function () {
+    $("fVirksomhed").value = ""; $("fRegion").value = "";
+    $("fLand").value = ""; $("fSoeg").value = ""; $("fForael").checked = false;
+    tegnTabel();
+  });
+  $("fEksport").addEventListener("click", eksporterCsv);
+
+  if (ctx.entity === "Accounts" && ctx.kontoNavn) {
+    const options = $("fVirksomhed").options;
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].value.length >= 3
+          && ctx.kontoNavn.toLowerCase().indexOf(options[i].value.toLowerCase()) !== -1) {
+        $("fVirksomhed").value = options[i].value; break;
+      }
+    }
+  }
+  tegnTabel();
+}
+
+/* =====================================================================
+   OPRET
+   ===================================================================== */
+function opsaetOpret() {
+  const sel = $("oMedlem");
+  alleKonti.forEach(function (k) {
+    const o = document.createElement("option");
+    o.value = k.id; o.textContent = k.navn;
+    sel.appendChild(o);
+  });
+  if (ctx.entity === "Accounts" && ctx.kontoId) {
+    sel.value = ctx.kontoId;
+  }
+  const dl = $("landeliste");
+  Array.from(new Set(alleRecords.map(function (r) { return F(r, "land"); }).filter(Boolean)))
+    .sort(function (a, b) { return a.localeCompare(b, "da"); })
+    .forEach(function (l) {
+      const o = document.createElement("option"); o.value = l; dl.appendChild(o);
+    });
+
+  $("oGem").addEventListener("click", gemAfdeling);
+  $("oRyd").addEventListener("click", rydFelter);
+}
+
+function rydFelter() {
+  ["oNavn", "oAdresse", "oPostnr", "oBy", "oLand", "oWebsite"].forEach(function (id) { $(id).value = ""; });
+  if (!(ctx.entity === "Accounts" && ctx.kontoId)) $("oMedlem").value = "";
+  skjulFejl();
+}
+function skjulFejl() {
+  ["eNavn", "eMedlem", "eAdresse", "ePostnr", "eBy", "eLand"].forEach(function (id) { $(id).hidden = true; });
+}
+
+function gemAfdeling() {
+  skjulFejl();
+  skjulBesked();
+  const v = {
+    navn:    $("oNavn").value.trim(),
+    medlem:  $("oMedlem").value,
+    adresse: $("oAdresse").value.trim(),
+    postnr:  $("oPostnr").value.trim(),
+    by:      $("oBy").value.trim(),
+    land:    $("oLand").value.trim(),
+    website: $("oWebsite").value.trim()
+  };
+  let ok = true;
+  const krav = [["navn","eNavn"],["medlem","eMedlem"],["adresse","eAdresse"],
+                ["postnr","ePostnr"],["by","eBy"],["land","eLand"]];
+  krav.forEach(function (par) {
+    if (!v[par[0]]) { $(par[1]).hidden = false; ok = false; }
+  });
+  if (!ok) { visBesked("Udfyld alle påkrævede felter (markeret med rødt).", "fejl"); return; }
+
+  const konto = alleKonti.filter(function (k) { return String(k.id) === String(v.medlem); })[0];
+  const brandNavn = konto ? konto.navn : "";
+
+  const data = {};
+  data[CONFIG.felter.navn]    = v.navn;
+  data[CONFIG.felter.medlem]  = { id: v.medlem };
+  data[CONFIG.felter.brand]   = brandNavn;
+  data[CONFIG.felter.adresse] = v.adresse;
+  data[CONFIG.felter.postnr]  = v.postnr;
+  data[CONFIG.felter.by]      = v.by;
+  data[CONFIG.felter.land]    = v.land;
+  data[CONFIG.felter.bekraeftet] = idagISO();   // ny afdeling = bekræftet i dag
+  if (v.website) data[CONFIG.felter.website] = v.website;
+
+  $("oGem").disabled = true;
+  visBesked("Gemmer afdeling og henter koordinater …");
+
+  ZOHO.CRM.API.insertRecord({
+    Entity: CONFIG.modul, APIData: data, Trigger: ["workflow"]
+  }).then(function (svar) {
+    $("oGem").disabled = false;
+    const r = svar && svar.data && svar.data[0];
+    if (r && r.code === "SUCCESS") {
+      visBesked("✔ Afdelingen \u201E" + v.navn + "\u201C er oprettet. "
+        + "Koordinaterne udfyldes automatisk inden for få sekunder.", "ok");
+      genindlaesData().then(function () {
+        rydFelter();
+        skiftFane("oversigt");
+      });
+    } else {
+      visBesked("Kunne ikke gemme: " + (r && r.message ? r.message : "ukendt fejl."), "fejl");
+      console.error("insertRecord svar:", svar);
+    }
+  }).catch(function (fejl) {
+    $("oGem").disabled = false;
+    visFejl(fejl);
+  });
+}
+
+async function genindlaesData() {
+  try {
+    alleRecords = await hentAlleAfdelinger();
+    genopbygFiltre();
+    tegnTabel();
+  } catch (e) { console.warn("Kunne ikke genindlæse:", e); }
+}
+
+/* =====================================================================
+   FANESKIFT
+   ===================================================================== */
+function skiftFane(navn) {
+  const erOversigt = navn === "oversigt";
+  $("visOversigt").hidden = !erOversigt;
+  $("visOpret").hidden = erOversigt;
+  $("faneOversigt").classList.toggle("aktiv", erOversigt);
+  $("faneOpret").classList.toggle("aktiv", !erOversigt);
+}
+
+/* =====================================================================
+   OPSTART
+   ===================================================================== */
+async function vedPageLoad(data) {
+  if (startTimeout) { clearTimeout(startTimeout); startTimeout = null; }
+  try {
+    visBesked("Henter data …");
+    const entitet = data && (data.Entity || data.entity);
+    let id = data && (data.EntityId || data.entityId);
+    if (Array.isArray(id)) id = id[0];
+    ctx.entity = entitet || null;
+    ctx.kontoId = id || null;
+
+    const resultater = await Promise.all([hentAlleAfdelinger(), hentAlleKonti()]);
+    alleRecords = resultater[0];
+    alleKonti = resultater[1];
+
+    if (entitet === "Accounts" && id) {
+      try {
+        const k = await ZOHO.CRM.API.getRecord({ Entity: "Accounts", RecordID: id });
+        if (k && k.data && k.data[0]) ctx.kontoNavn = k.data[0].Account_Name || "";
+      } catch (e) { console.warn("Kunne ikke hente kontonavn:", e); }
+    }
+
+    skjulBesked();
+    opsaetOversigt();
+    opsaetOpret();
+  } catch (fejl) {
+    visFejl(fejl);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  $("faneOversigt").addEventListener("click", function () { skiftFane("oversigt"); });
+  $("faneOpret").addEventListener("click", function () { skiftFane("opret"); });
+
+  if (!window.ZOHO || !ZOHO.embeddedApp) {
+    visBesked("Zoho-SDK'et kunne ikke indlæses. Siden skal åbnes inde fra Zoho CRM.", "fejl");
+    return;
+  }
+  startTimeout = setTimeout(function () {
+    visBesked("Denne side skal åbnes inde i Zoho CRM (som webfane eller relateret liste) – "
+      + "den virker ikke som selvstændig fil.", "fejl");
+  }, 10000);
+  ZOHO.embeddedApp.on("PageLoad", vedPageLoad);
+  ZOHO.embeddedApp.init();
+});
+</script>
+</body>
+</html>
