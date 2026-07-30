@@ -25,8 +25,14 @@
   .besked { padding: 14px 16px; font-size: 14px; background: #fff7e6;
             color: #7a4b00; border-bottom: 1px solid #f0dcb4; }
   .besked.fejl { background: #fdecec; color: #8a1f1f; border-color: #f2c4c4; }
-  .bund { padding: 6px 10px; font-size: 12px; color: #666;
+  .bund { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+          padding: 6px 10px; font-size: 12px; color: #666;
           border-top: 1px solid #e3e3e3; background: #fafafa; }
+  .sig { display: inline-flex; align-items: center; gap: 5px; }
+  .sig .prik { width: 12px; height: 12px; border-radius: 50%; display: inline-block;
+               border: 1px solid rgba(0,0,0,.25); }
+  .prik-blaa { background: #2a81cb; }
+  .prik-groen { background: #2e9e4f; }
   .pop { font-size: 13px; line-height: 1.45; max-width: 240px; }
   .pop-navn  { font-weight: 600; margin-bottom: 2px; }
   .pop-brand { color: #666; font-size: 12px; margin-bottom: 4px; }
@@ -37,6 +43,10 @@
   .pop-bekraeft.foraeldet { color: #c0392b; font-weight: 600; }
   .pop-links a { color: #1a56a0; text-decoration: none; }
   .pop-links a:hover { text-decoration: underline; }
+  /* farvede pins via divIcon */
+  .pin { width: 26px; height: 41px; position: relative; }
+  .pin svg { width: 26px; height: 41px; display: block;
+             filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
   /* multi-select */
   .ms { position: relative; }
   .ms > summary { list-style: none; cursor: pointer; padding: 6px 10px;
@@ -107,6 +117,23 @@ let alleRecords = [];
 let kontoMap = {};   // id -> { navn, type }
 const tilstand = { mode: "global", kontoId: null, kontoNavn: "", brands: [] };
 let startTimeout = null;
+
+/* ---- farvede pin-ikoner (blå = normal, grøn = hovedkontor) ---- */
+function pinSvg(farve) {
+  return '<div class="pin"><svg viewBox="0 0 26 41" xmlns="http://www.w3.org/2000/svg">'
+    + '<path d="M13 0C5.8 0 0 5.8 0 13c0 9 13 28 13 28s13-19 13-28C26 5.8 20.2 0 13 0z" fill="'
+    + farve + '"/>'
+    + '<circle cx="13" cy="13" r="5" fill="#ffffff" fill-opacity="0.9"/></svg></div>';
+}
+const ICON_NORMAL = L.divIcon({
+  className: "", html: pinSvg("#2a81cb"),
+  iconSize: [26, 41], iconAnchor: [13, 41], popupAnchor: [0, -36]
+});
+const ICON_HK = L.divIcon({
+  className: "", html: pinSvg("#2e9e4f"),
+  iconSize: [26, 41], iconAnchor: [13, 41], popupAnchor: [0, -36]
+});
+
 function $(id) { return document.getElementById(id); }
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -114,6 +141,7 @@ function esc(s) {
   });
 }
 function F(rec, noegle) { return rec[CONFIG.felter[noegle]]; }
+function erHovedkontor(r) { return F(r, "afdelingstype") === CONFIG.hovedkontorType; }
 function visBesked(tekst, erFejl) {
   const b = $("besked"); b.textContent = tekst; b.classList.toggle("fejl", !!erFejl); b.hidden = false;
 }
@@ -154,7 +182,7 @@ function popupHtml(r) {
   const navn  = esc(F(r, "navn"));
   const brand = esc(F(r, "brand"));
   const type  = F(r, "afdelingstype");
-  const hk = (type === CONFIG.hovedkontorType) ? '<div class="pop-hk">🏢 ' + esc(type) + "</div>" : "";
+  const hk = erHovedkontor(r) ? '<div class="pop-hk">🏢 ' + esc(type) + "</div>" : "";
   const dele  = [];
   const adr   = esc(F(r, "adresse"));
   const linje2 = [esc(F(r, "postnr")), esc(F(r, "by"))].filter(Boolean).join(" ");
@@ -185,18 +213,30 @@ function tegnMarkers(liste) {
   cluster.clearLayers();
   const pins = [];
   let udenKoordinater = 0;
+  let antalHK = 0;
   liste.forEach(function (r) {
     const la = parseFloat(F(r, "lat")), lo = parseFloat(F(r, "lon"));
     if (isNaN(la) || isNaN(lo)) { udenKoordinater++; return; }
-    const m = L.marker([la, lo]); m.bindPopup(popupHtml(r)); pins.push(m);
+    const hk = erHovedkontor(r);
+    if (hk) antalHK++;
+    const m = L.marker([la, lo], { icon: hk ? ICON_HK : ICON_NORMAL });
+    m.bindPopup(popupHtml(r));
+    pins.push(m);
   });
   cluster.addLayers(pins);
   if (pins.length === 1) kort.setView(pins[0].getLatLng(), 9);
   else if (pins.length > 1) kort.fitBounds(cluster.getBounds().pad(0.08));
+  return { viste: pins.length, uden: udenKoordinater, hk: antalHK };
+}
+/* opdater bundlinjen med signaturforklaring + evt. tælling */
+function opdaterBund(res, ekstraTekst) {
   const bund = $("bund");
-  if (udenKoordinater > 0) { bund.textContent = udenKoordinater + " afdeling(er) uden koordinater vises ikke på kortet."; bund.hidden = false; }
-  else bund.hidden = true;
-  return { viste: pins.length, uden: udenKoordinater };
+  let html = '<span class="sig"><span class="prik prik-blaa"></span>Afdeling</span>'
+           + '<span class="sig"><span class="prik prik-groen"></span>🏢 Dansk hovedkontor</span>';
+  if (ekstraTekst) html += "<span>" + esc(ekstraTekst) + "</span>";
+  if (res && res.uden > 0) html += "<span>" + res.uden + " uden koordinater vises ikke</span>";
+  bund.innerHTML = html;
+  bund.hidden = false;
 }
 /* ---------- datahentning ---------- */
 function hentSide(side) {
@@ -253,11 +293,8 @@ function startMedlemstilstand() {
     return;
   }
   const res = tegnMarkers(liste);
-  const bund = $("bund");
   const navnetekst = tilstand.brands.length ? tilstand.brands.join(", ") : tilstand.kontoNavn;
-  bund.textContent = "Viser " + res.viste + " lokation(er) for " + navnetekst
-                   + (res.uden ? " \u00b7 " + res.uden + " uden koordinater vises ikke" : "");
-  bund.hidden = false;
+  opdaterBund(res, "Viser " + res.viste + " lokation(er) for " + navnetekst);
 }
 /* ---------- global tilstand med filtre ---------- */
 function opsaetMedlemstypeMultiselect() {
@@ -307,6 +344,7 @@ function anvendFilter() {
   });
   const res = tegnMarkers(liste);
   $("taeller").textContent = res.viste + " af " + alleRecords.length + " afdelinger";
+  opdaterBund(res, res.hk + " hovedkontorer");
 }
 function startGlobalTilstand() {
   $("filterbar").hidden = false;
