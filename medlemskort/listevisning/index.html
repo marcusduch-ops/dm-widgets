@@ -22,12 +22,12 @@
          font-size: 13px; background: #fff; }
   .top input[type=text] { min-width: 190px; }
   .top button, .knap { padding: 6px 12px; border: 1px solid #c9c9c9;
-         border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; }
+         border-radius: 6px; background: #fff; color: #1c1c1c; font-size: 13px; cursor: pointer; }
   .top button:hover, .knap:hover { background: #f0f0f0; }
-  .knap-primaer { background: #1a56a0; border-color: #1a56a0; color: #fff; }
-  .knap-primaer:hover { background: #16487f; }
+  .knap-excel { background: #eef4fb; border-color: #bcd3ee; color: #1c1c1c; font-weight: 600; }
+  .knap-excel:hover { background: #e0ecf9; }
   .knap-lille { padding: 3px 8px; font-size: 12px; border: 1px solid #c9c9c9;
-         border-radius: 5px; background: #fff; cursor: pointer; white-space: nowrap; }
+         border-radius: 5px; background: #fff; color: #1c1c1c; cursor: pointer; white-space: nowrap; }
   .knap-lille:hover { background: #f0f0f0; }
   .knap-slet { color: #a01a1a; border-color: #e2b6b6; }
   .knap-slet:hover { background: #fdecec; }
@@ -113,7 +113,7 @@
     <input id="fSoeg" type="text" placeholder="Søg afdeling, by eller adresse …">
     <label id="kunForael"><input type="checkbox" id="fForael"> Kun forældede</label>
     <button id="fNulstil" type="button">Nulstil</button>
-    <button id="fExcel" type="button" class="knap-primaer">⬇ Eksportér til Excel</button>
+    <button id="fExcel" type="button" class="knap knap-excel">⬇ Eksportér denne visning til Excel</button>
     <span id="taeller"></span>
   </div>
   <div class="tabelboks">
@@ -183,7 +183,7 @@
         <input id="oWebsite" type="text" placeholder="https://…">
       </div>
       <div class="formknapper">
-        <button id="oGem" type="button" class="knap knap-primaer">Gem afdeling</button>
+        <button id="oGem" type="button" class="knap knap-gem">Gem afdeling</button>
         <button id="oRyd" type="button" class="knap">Ryd felter</button>
       </div>
     </div>
@@ -196,9 +196,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script id="hovedscript">
 "use strict";
-/* =====================================================================
-   KONFIGURATION — skal matche API-navnene i CRM. Ret KUN her.
-   ===================================================================== */
 const CONFIG = {
   modul: "Afdelinger",
   felter: {
@@ -226,7 +223,6 @@ function erHovedkontor(r) {
   if (!t) return false;
   return String(t).trim().toLowerCase() === CONFIG.hovedkontorType.trim().toLowerCase();
 }
-
 const REGIONER = {
   "Norden": ["Danmark","Færøerne","Grønland","Island","Norge","Sverige","Finland","Åland"],
   "Vesteuropa": ["Tyskland","Nederlandene","Holland","Belgien","Frankrig","Storbritannien",
@@ -264,7 +260,6 @@ function regionForLand(land) {
   if (!land) return "Ukendt";
   return LAND_TIL_REGION[String(land).trim().toLowerCase()] || "Øvrige";
 }
-
 function toCifre(n) { return (n < 10 ? "0" : "") + n; }
 function datoISO(d) { return d.getFullYear() + "-" + toCifre(d.getMonth() + 1) + "-" + toCifre(d.getDate()); }
 function idagISO() { return datoISO(new Date()); }
@@ -276,7 +271,6 @@ function bekraeftStatus(rec) {
   const alderDage = (Date.now() - d.getTime()) / 86400000;
   return { harDato: true, foraeldet: alderDage > CONFIG.bekraeftGraenseDage, tekst: datoISO(d) };
 }
-
 let alleRecords = [];
 let alleKonti = [];
 let kontoMap = {};
@@ -284,7 +278,6 @@ let synligListe = [];
 const ctx = { entity: null, kontoId: null, kontoNavn: "" };
 let startTimeout = null;
 let redigererId = null;
-
 function $(id) { return document.getElementById(id); }
 function F(rec, noegle) { return rec[CONFIG.felter[noegle]]; }
 function esc(s) {
@@ -307,7 +300,6 @@ function medlemstypeForAfd(r) {
   const k = kontoMap[String(m.id)];
   return k ? k.type : null;
 }
-
 async function hentAlleAfdelinger() {
   let side = 1, ud = [];
   while (side <= 25) {
@@ -339,8 +331,6 @@ async function hentAlleKonti() {
   return { medlemmer: medlemmer, map: map };
 }
 function recordById(id) { return alleRecords.filter(function (r) { return String(r.id) === String(id); })[0]; }
-
-/* ---------- medlemstype multiselect ---------- */
 function opsaetMedlemstypeMultiselect() {
   const panel = $("msPanel"); panel.innerHTML = "";
   CONFIG.konto.alleMedlemstyper.forEach(function (t) {
@@ -361,7 +351,6 @@ function opdaterMsSummary() {
   const valgt = valgteMedlemstyper(), alle = CONFIG.konto.alleMedlemstyper.length;
   $("msSummary").textContent = (valgt.length === alle) ? "Medlemstype: alle" : "Medlemstype: " + valgt.length + " valgt";
 }
-
 function udfyldFiltre() {
   const virks = Array.from(new Set(alleRecords.map(function (r) { return F(r, "brand"); }).filter(Boolean)))
     .sort(function (a, b) { return a.localeCompare(b, "da"); });
@@ -376,7 +365,6 @@ function udfyldFiltre() {
 function tilfoejOption(selId, vaerdi) {
   const o = document.createElement("option"); o.value = vaerdi; o.textContent = vaerdi; $(selId).appendChild(o);
 }
-
 function filtreretListe() {
   const virk = $("fVirksomhed").value, region = $("fRegion").value, land = $("fLand").value;
   const soeg = $("fSoeg").value.trim().toLowerCase();
@@ -397,7 +385,6 @@ function filtreretListe() {
     return true;
   });
 }
-
 function tegnTabel() {
   const liste = filtreretListe();
   synligListe = liste;
@@ -416,7 +403,6 @@ function tegnTabel() {
     + (antalForael ? " · " + antalForael + " forældede" : "");
   return liste;
 }
-
 function typeCelleHtml(r) {
   const t = F(r, "afdelingstype");
   if (!t) return "<td></td>";
@@ -485,7 +471,6 @@ function byggRedigerRaekke(tr, r) {
   tr.querySelector('[data-akt="fortryd"]').addEventListener("click", function () { redigererId = null; tegnTabel(); });
 }
 function startRedigering(id) { redigererId = id; tegnTabel(); }
-
 function genbekraeft(id) {
   const r = recordById(id); if (!r) return;
   const idag = idagISO();
@@ -500,7 +485,6 @@ function genbekraeft(id) {
       } else { visBesked("Kunne ikke bekræfte: " + (res && res.message ? res.message : "ukendt fejl."), "fejl"); console.error(svar); }
     }).catch(function (fejl) { visFejl(fejl); });
 }
-
 function gemRedigering(id, tr) {
   const r = recordById(id); if (!r) return;
   const inputs = tr.querySelectorAll("input.celle");
@@ -535,7 +519,6 @@ function gemRedigering(id, tr) {
       } else { gemKnap.disabled = false; visBesked("Kunne ikke gemme: " + (res && res.message ? res.message : "ukendt fejl."), "fejl"); console.error(svar); }
     }).catch(function (fejl) { gemKnap.disabled = false; visFejl(fejl); });
 }
-
 function sletAfdeling(id) {
   const r = recordById(id);
   const navn = r ? (F(r, "navn") || "afdelingen") : "afdelingen";
@@ -552,7 +535,6 @@ function sletAfdeling(id) {
       } else { visBesked("Kunne ikke slette: " + (res && res.message ? res.message : "ukendt fejl."), "fejl"); console.error(svar); }
     }).catch(function (fejl) { visFejl(fejl); });
 }
-
 function genopbygFiltre() {
   const gemtVirk = $("fVirksomhed").value, gemtReg = $("fRegion").value, gemtLand = $("fLand").value;
   ["fVirksomhed", "fRegion", "fLand"].forEach(function (id) { const sel = $(id); while (sel.options.length > 1) sel.remove(1); });
@@ -561,7 +543,6 @@ function genopbygFiltre() {
   if ([].some.call($("fRegion").options, function (o) { return o.value === gemtReg; })) $("fRegion").value = gemtReg;
   if ([].some.call($("fLand").options, function (o) { return o.value === gemtLand; })) $("fLand").value = gemtLand;
 }
-
 function eksporterExcel() {
   const liste = synligListe;
   if (!liste || liste.length === 0) { visBesked("Der er ingen rækker at eksportere med de valgte filtre.", "fejl"); return; }
@@ -582,7 +563,6 @@ function eksporterExcel() {
   XLSX.utils.book_append_sheet(wb, ws, "Afdelinger");
   XLSX.writeFile(wb, "afdelinger_" + idagISO() + ".xlsx");
 }
-
 function opsaetOversigt() {
   udfyldFiltre();
   opsaetMedlemstypeMultiselect();
@@ -606,7 +586,6 @@ function opsaetOversigt() {
   }
   tegnTabel();
 }
-
 function opsaetOpret() {
   const sel = $("oMedlem"); while (sel.options.length > 1) sel.remove(1);
   alleKonti.forEach(function (k) { const o = document.createElement("option"); o.value = k.id; o.textContent = k.navn; sel.appendChild(o); });
@@ -632,7 +611,6 @@ function rydFelter() {
   skjulFejl();
 }
 function skjulFejl() { ["eNavn", "eMedlem", "eAdresse", "ePostnr", "eBy", "eLand"].forEach(function (id) { $(id).hidden = true; }); }
-
 function gemAfdeling() {
   skjulFejl(); skjulBesked();
   const v = {
@@ -663,19 +641,16 @@ function gemAfdeling() {
       } else { visBesked("Kunne ikke gemme: " + (r && r.message ? r.message : "ukendt fejl."), "fejl"); console.error(svar); }
     }).catch(function (fejl) { $("oGem").disabled = false; visFejl(fejl); });
 }
-
 async function genindlaesData() {
   try { alleRecords = await hentAlleAfdelinger(); genopbygFiltre(); tegnTabel(); }
   catch (e) { console.warn("Kunne ikke genindlæse:", e); }
 }
-
 function skiftFane(navn) {
   const erOversigt = navn === "oversigt";
   $("visOversigt").hidden = !erOversigt; $("visOpret").hidden = erOversigt;
   $("faneOversigt").classList.toggle("aktiv", erOversigt);
   $("faneOpret").classList.toggle("aktiv", !erOversigt);
 }
-
 async function vedPageLoad(data) {
   if (startTimeout) { clearTimeout(startTimeout); startTimeout = null; }
   try {
@@ -695,7 +670,6 @@ async function vedPageLoad(data) {
     skjulBesked(); opsaetOversigt(); opsaetOpret();
   } catch (fejl) { visFejl(fejl); }
 }
-
 document.addEventListener("DOMContentLoaded", function () {
   $("faneOversigt").addEventListener("click", function () { skiftFane("oversigt"); });
   $("faneOpret").addEventListener("click", function () { skiftFane("opret"); });
@@ -715,4 +689,3 @@ document.addEventListener("DOMContentLoaded", function () {
 </script>
 </body>
 </html>
-
