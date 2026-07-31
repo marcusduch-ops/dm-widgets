@@ -18,10 +18,10 @@
          font-size: 13px; background: #fff; }
   .top input[type=text] { min-width: 170px; }
   .top button, .knap { padding: 6px 12px; border: 1px solid #c9c9c9; border-radius: 6px;
-         background: #fff; font-size: 13px; cursor: pointer; }
+         background: #fff; color: #1c1c1c; font-size: 13px; cursor: pointer; }
   .top button:hover, .knap:hover { background: #f0f0f0; }
-  .knap-primaer { background: #1a56a0; border-color: #1a56a0; color: #fff; }
-  .knap-primaer:hover { background: #16487f; }
+  .knap-excel { background: #eef4fb; border-color: #bcd3ee; color: #1c1c1c; font-weight: 600; }
+  .knap-excel:hover { background: #e0ecf9; }
   #taeller { font-size: 12.5px; color: #555; margin-left: auto; }
   #kort { flex: 1; min-height: 260px; }
   .besked { padding: 14px 16px; font-size: 14px; background: #fff7e6;
@@ -45,17 +45,14 @@
   .pop-bekraeft.foraeldet { color: #c0392b; font-weight: 600; }
   .pop-links a { color: #1a56a0; text-decoration: none; }
   .pop-links a:hover { text-decoration: underline; }
-  /* farvede pins via divIcon */
   .pin { width: 26px; height: 41px; position: relative; }
   .pin svg { width: 26px; height: 41px; display: block;
              filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
-  /* medlemsnavn-label på pins (vises kun når zoomet ind) */
   .pin-label { background: rgba(255,255,255,.92); border: 1px solid #cfd6df;
                border-radius: 5px; padding: 1px 6px; font-size: 11.5px; font-weight: 600;
                color: #222; box-shadow: 0 1px 3px rgba(0,0,0,.18); white-space: nowrap; }
-  .pin-label::before { display: none; } /* fjern tooltip-pilen */
-  .leaflet-container:not(.zoomet) .pin-label { display: none; } /* skjul labels ved lav zoom */
-  /* multi-select */
+  .pin-label::before { display: none; }
+  .leaflet-container:not(.zoomet) .pin-label { display: none; }
   .ms { position: relative; }
   .ms > summary { list-style: none; cursor: pointer; padding: 6px 10px;
          border: 1px solid #c9c9c9; border-radius: 6px; background: #fff; font-size: 13px; user-select: none; }
@@ -81,7 +78,7 @@
     <input type="checkbox" id="fForael"> Kun forældede
   </label>
   <button id="fNulstil" type="button">Nulstil</button>
-  <button id="fExcel" type="button" class="knap-primaer">⬇ Eksportér til Excel</button>
+  <button id="fExcel" type="button" class="knap knap-excel">⬇ Eksportér denne visning til Excel</button>
   <span id="taeller"></span>
 </div>
 <div class="besked" id="besked" hidden></div>
@@ -115,7 +112,7 @@ const CONFIG = {
   minBrandLaengde: 3,
   bekraeftGraenseDage: 365,
   hovedkontorType: "Dansk hovedkontor",
-  labelZoom: 8,   // fra dette zoomniveau vises medlemsnavne på pins
+  labelZoom: 8,
   konto: {
     navnFelt:        "Account_Name",
     medlemstypeFelt: "Medlemstype",
@@ -125,26 +122,19 @@ const CONFIG = {
 /* ===================================================================== */
 let kort, cluster;
 let alleRecords = [];
-let kontoMap = {};   // id -> { navn, type }
-let synligListe = [];   // aktuelt viste (filtrerede) records – bruges til Excel
+let kontoMap = {};
+let synligListe = [];
 const tilstand = { mode: "global", kontoId: null, kontoNavn: "", brands: [] };
 let startTimeout = null;
 
-/* ---- farvede pin-ikoner (blå = normal, grøn = hovedkontor) ---- */
 function pinSvg(farve) {
   return '<div class="pin"><svg viewBox="0 0 26 41" xmlns="http://www.w3.org/2000/svg">'
     + '<path d="M13 0C5.8 0 0 5.8 0 13c0 9 13 28 13 28s13-19 13-28C26 5.8 20.2 0 13 0z" fill="'
     + farve + '"/>'
     + '<circle cx="13" cy="13" r="5" fill="#ffffff" fill-opacity="0.9"/></svg></div>';
 }
-const ICON_NORMAL = L.divIcon({
-  className: "", html: pinSvg("#2a81cb"),
-  iconSize: [26, 41], iconAnchor: [13, 41], popupAnchor: [0, -36]
-});
-const ICON_HK = L.divIcon({
-  className: "", html: pinSvg("#2e9e4f"),
-  iconSize: [26, 41], iconAnchor: [13, 41], popupAnchor: [0, -36]
-});
+const ICON_NORMAL = L.divIcon({ className: "", html: pinSvg("#2a81cb"), iconSize: [26, 41], iconAnchor: [13, 41], popupAnchor: [0, -36] });
+const ICON_HK = L.divIcon({ className: "", html: pinSvg("#2e9e4f"), iconSize: [26, 41], iconAnchor: [13, 41], popupAnchor: [0, -36] });
 
 function $(id) { return document.getElementById(id); }
 function esc(s) {
@@ -158,7 +148,6 @@ function erHovedkontor(r) {
   if (!t) return false;
   return String(t).trim().toLowerCase() === CONFIG.hovedkontorType.trim().toLowerCase();
 }
-/* medlemsnavn til label: brug Brand, ellers kontonavn via lookup, ellers afdelingsnavn */
 function medlemsNavn(r) {
   const b = F(r, "brand");
   if (b) return b;
@@ -167,9 +156,7 @@ function medlemsNavn(r) {
   if (m && m.name) return m.name;
   return F(r, "navn") || "";
 }
-function visBesked(tekst, erFejl) {
-  const b = $("besked"); b.textContent = tekst; b.classList.toggle("fejl", !!erFejl); b.hidden = false;
-}
+function visBesked(tekst, erFejl) { const b = $("besked"); b.textContent = tekst; b.classList.toggle("fejl", !!erFejl); b.hidden = false; }
 function skjulBesked() { $("besked").hidden = true; }
 function visFejl(fejl) {
   console.error("Afdelingskort-fejl:", fejl);
@@ -182,7 +169,6 @@ function medlemstypeForAfd(r) {
   const k = kontoMap[String(m.id)];
   return k ? k.type : null;
 }
-/* ---------- bekræftelses-status ---------- */
 function toCifre(n) { return (n < 10 ? "0" : "") + n; }
 function datoISO(d) { return d.getFullYear() + "-" + toCifre(d.getMonth() + 1) + "-" + toCifre(d.getDate()); }
 function idagISO() { return datoISO(new Date()); }
@@ -194,7 +180,6 @@ function bekraeftStatus(rec) {
   const alderDage = (Date.now() - d.getTime()) / 86400000;
   return { harDato: true, foraeldet: alderDage > CONFIG.bekraeftGraenseDage, tekst: datoISO(d) };
 }
-/* ---------- kort ---------- */
 function initKort() {
   kort = L.map("kort", { worldCopyJump: true }).setView([25, 10], 2);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -203,7 +188,6 @@ function initKort() {
   }).addTo(kort);
   cluster = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45 });
   kort.addLayer(cluster);
-  // Vis/skjul medlemsnavne afhængigt af zoomniveau
   kort.on("zoomend", opdaterLabelSynlighed);
   opdaterLabelSynlighed();
 }
@@ -255,11 +239,9 @@ function tegnMarkers(liste) {
     if (hk) antalHK++;
     const m = L.marker([la, lo], { icon: hk ? ICON_HK : ICON_NORMAL });
     m.bindPopup(popupHtml(r));
-    // Permanent tooltip med medlemsnavn – CSS skjuler den, indtil man zoomer ind
     const label = medlemsNavn(r);
     if (label) {
-      m.bindTooltip(esc(label), { permanent: true, direction: "top",
-        offset: [0, -38], className: "pin-label", opacity: 1 });
+      m.bindTooltip(esc(label), { permanent: true, direction: "top", offset: [0, -38], className: "pin-label", opacity: 1 });
     }
     pins.push(m);
   });
@@ -278,7 +260,6 @@ function opdaterBund(res, ekstraTekst) {
   bund.innerHTML = html;
   bund.hidden = false;
 }
-/* ---------- Excel-eksport af aktuel visning ---------- */
 function eksporterExcel() {
   const liste = synligListe;
   if (!liste || liste.length === 0) { visBesked("Der er ingen afdelinger at eksportere i den aktuelle visning.", true); return; }
@@ -300,7 +281,6 @@ function eksporterExcel() {
   XLSX.utils.book_append_sheet(wb, ws, "Afdelinger");
   XLSX.writeFile(wb, "afdelinger_" + idagISO() + ".xlsx");
 }
-/* ---------- datahentning ---------- */
 function hentSide(side) {
   return ZOHO.CRM.API.getAllRecords({ Entity: CONFIG.modul, sort_order: "asc", per_page: 200, page: side });
 }
@@ -328,7 +308,6 @@ async function hentKontoMap() {
   }
   return map;
 }
-/* ---------- medlemstilstand ---------- */
 function findBrands() {
   const fundet = new Set();
   alleRecords.forEach(function (r) {
@@ -359,7 +338,6 @@ function startMedlemstilstand() {
   const navnetekst = tilstand.brands.length ? tilstand.brands.join(", ") : tilstand.kontoNavn;
   opdaterBund(res, "Viser " + res.viste + " lokation(er) for " + navnetekst);
 }
-/* ---------- global tilstand med filtre ---------- */
 function opsaetMedlemstypeMultiselect() {
   const panel = $("msPanel"); panel.innerHTML = "";
   CONFIG.konto.alleMedlemstyper.forEach(function (t) {
@@ -429,7 +407,6 @@ function startGlobalTilstand() {
   });
   anvendFilter();
 }
-/* ---------- opstart ---------- */
 async function vedPageLoad(data) {
   if (startTimeout) { clearTimeout(startTimeout); startTimeout = null; }
   try {
