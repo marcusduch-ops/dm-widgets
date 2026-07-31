@@ -17,9 +17,11 @@
          padding: 6px 8px; border: 1px solid #c9c9c9; border-radius: 6px;
          font-size: 13px; background: #fff; }
   .top input[type=text] { min-width: 170px; }
-  .top button { padding: 6px 12px; border: 1px solid #c9c9c9; border-radius: 6px;
+  .top button, .knap { padding: 6px 12px; border: 1px solid #c9c9c9; border-radius: 6px;
          background: #fff; font-size: 13px; cursor: pointer; }
-  .top button:hover { background: #f0f0f0; }
+  .top button:hover, .knap:hover { background: #f0f0f0; }
+  .knap-primaer { background: #1a56a0; border-color: #1a56a0; color: #fff; }
+  .knap-primaer:hover { background: #16487f; }
   #taeller { font-size: 12.5px; color: #555; margin-left: auto; }
   #kort { flex: 1; min-height: 260px; }
   .besked { padding: 14px 16px; font-size: 14px; background: #fff7e6;
@@ -47,6 +49,12 @@
   .pin { width: 26px; height: 41px; position: relative; }
   .pin svg { width: 26px; height: 41px; display: block;
              filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
+  /* medlemsnavn-label på pins (vises kun når zoomet ind) */
+  .pin-label { background: rgba(255,255,255,.92); border: 1px solid #cfd6df;
+               border-radius: 5px; padding: 1px 6px; font-size: 11.5px; font-weight: 600;
+               color: #222; box-shadow: 0 1px 3px rgba(0,0,0,.18); white-space: nowrap; }
+  .pin-label::before { display: none; } /* fjern tooltip-pilen */
+  .leaflet-container:not(.zoomet) .pin-label { display: none; } /* skjul labels ved lav zoom */
   /* multi-select */
   .ms { position: relative; }
   .ms > summary { list-style: none; cursor: pointer; padding: 6px 10px;
@@ -73,6 +81,7 @@
     <input type="checkbox" id="fForael"> Kun forældede
   </label>
   <button id="fNulstil" type="button">Nulstil</button>
+  <button id="fExcel" type="button" class="knap-primaer">⬇ Eksportér til Excel</button>
   <span id="taeller"></span>
 </div>
 <div class="besked" id="besked" hidden></div>
@@ -81,6 +90,7 @@
 <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script id="hovedscript">
 "use strict";
 /* =====================================================================
@@ -105,6 +115,7 @@ const CONFIG = {
   minBrandLaengde: 3,
   bekraeftGraenseDage: 365,
   hovedkontorType: "Dansk hovedkontor",
+  labelZoom: 8,   // fra dette zoomniveau vises medlemsnavne på pins
   konto: {
     navnFelt:        "Account_Name",
     medlemstypeFelt: "Medlemstype",
@@ -115,6 +126,7 @@ const CONFIG = {
 let kort, cluster;
 let alleRecords = [];
 let kontoMap = {};   // id -> { navn, type }
+let synligListe = [];   // aktuelt viste (filtrerede) records – bruges til Excel
 const tilstand = { mode: "global", kontoId: null, kontoNavn: "", brands: [] };
 let startTimeout = null;
 
@@ -146,6 +158,15 @@ function erHovedkontor(r) {
   if (!t) return false;
   return String(t).trim().toLowerCase() === CONFIG.hovedkontorType.trim().toLowerCase();
 }
+/* medlemsnavn til label: brug Brand, ellers kontonavn via lookup, ellers afdelingsnavn */
+function medlemsNavn(r) {
+  const b = F(r, "brand");
+  if (b) return b;
+  const m = F(r, "medlem");
+  if (m && m.id && kontoMap[String(m.id)]) return kontoMap[String(m.id)].navn;
+  if (m && m.name) return m.name;
+  return F(r, "navn") || "";
+}
 function visBesked(tekst, erFejl) {
   const b = $("besked"); b.textContent = tekst; b.classList.toggle("fejl", !!erFejl); b.hidden = false;
 }
@@ -164,6 +185,7 @@ function medlemstypeForAfd(r) {
 /* ---------- bekræftelses-status ---------- */
 function toCifre(n) { return (n < 10 ? "0" : "") + n; }
 function datoISO(d) { return d.getFullYear() + "-" + toCifre(d.getMonth() + 1) + "-" + toCifre(d.getDate()); }
+function idagISO() { return datoISO(new Date()); }
 function bekraeftStatus(rec) {
   const raa = F(rec, "bekraeftet");
   if (!raa) return { harDato: false, foraeldet: true, tekst: "aldrig bekræftet" };
@@ -181,6 +203,14 @@ function initKort() {
   }).addTo(kort);
   cluster = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45 });
   kort.addLayer(cluster);
+  // Vis/skjul medlemsnavne afhængigt af zoomniveau
+  kort.on("zoomend", opdaterLabelSynlighed);
+  opdaterLabelSynlighed();
+}
+function opdaterLabelSynlighed() {
+  if (!kort) return;
+  const vis = kort.getZoom() >= CONFIG.labelZoom;
+  kort.getContainer().classList.toggle("zoomet", vis);
 }
 function popupHtml(r) {
   const navn  = esc(F(r, "navn"));
@@ -225,14 +255,20 @@ function tegnMarkers(liste) {
     if (hk) antalHK++;
     const m = L.marker([la, lo], { icon: hk ? ICON_HK : ICON_NORMAL });
     m.bindPopup(popupHtml(r));
+    // Permanent tooltip med medlemsnavn – CSS skjuler den, indtil man zoomer ind
+    const label = medlemsNavn(r);
+    if (label) {
+      m.bindTooltip(esc(label), { permanent: true, direction: "top",
+        offset: [0, -38], className: "pin-label", opacity: 1 });
+    }
     pins.push(m);
   });
   cluster.addLayers(pins);
   if (pins.length === 1) kort.setView(pins[0].getLatLng(), 9);
   else if (pins.length > 1) kort.fitBounds(cluster.getBounds().pad(0.08));
+  opdaterLabelSynlighed();
   return { viste: pins.length, uden: udenKoordinater, hk: antalHK };
 }
-/* opdater bundlinjen med signaturforklaring + evt. tælling */
 function opdaterBund(res, ekstraTekst) {
   const bund = $("bund");
   let html = '<span class="sig"><span class="prik prik-blaa"></span>Afdeling</span>'
@@ -241,6 +277,28 @@ function opdaterBund(res, ekstraTekst) {
   if (res && res.uden > 0) html += "<span>" + res.uden + " uden koordinater vises ikke</span>";
   bund.innerHTML = html;
   bund.hidden = false;
+}
+/* ---------- Excel-eksport af aktuel visning ---------- */
+function eksporterExcel() {
+  const liste = synligListe;
+  if (!liste || liste.length === 0) { visBesked("Der er ingen afdelinger at eksportere i den aktuelle visning.", true); return; }
+  const kol = ["Afdeling","Virksomhed","Medlemstype","Afdelingstype","Land","By","Postnummer",
+               "Adresse","Website","Sidst bekræftet","Latitude","Longitude"];
+  const rows = [kol];
+  liste.forEach(function (r) {
+    rows.push([
+      F(r, "navn") || "", F(r, "brand") || "", medlemstypeForAfd(r) || "",
+      F(r, "afdelingstype") || "", F(r, "land") || "", F(r, "by") || "", F(r, "postnr") || "",
+      F(r, "adresse") || "", F(r, "website") || "",
+      bekraeftStatus(r).harDato ? bekraeftStatus(r).tekst : "",
+      F(r, "lat") || "", F(r, "lon") || ""
+    ]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = kol.map(function (h, i) { return { wch: i === 7 ? 34 : (i === 0 || i === 1 ? 26 : 15) }; });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Afdelinger");
+  XLSX.writeFile(wb, "afdelinger_" + idagISO() + ".xlsx");
 }
 /* ---------- datahentning ---------- */
 function hentSide(side) {
@@ -296,6 +354,7 @@ function startMedlemstilstand() {
       + "Tilføj dem via den relaterede liste \u201EAfdelinger\u201C på kontoen.");
     return;
   }
+  synligListe = liste;
   const res = tegnMarkers(liste);
   const navnetekst = tilstand.brands.length ? tilstand.brands.join(", ") : tilstand.kontoNavn;
   opdaterBund(res, "Viser " + res.viste + " lokation(er) for " + navnetekst);
@@ -346,6 +405,7 @@ function anvendFilter() {
     }
     return true;
   });
+  synligListe = liste;
   const res = tegnMarkers(liste);
   $("taeller").textContent = res.viste + " af " + alleRecords.length + " afdelinger";
   opdaterBund(res, res.hk + " hovedkontorer");
@@ -358,6 +418,7 @@ function startGlobalTilstand() {
   $("fBrand").addEventListener("change", anvendFilter);
   $("fSoeg").addEventListener("input", anvendFilter);
   $("fForael").addEventListener("change", anvendFilter);
+  $("fExcel").addEventListener("click", eksporterExcel);
   $("fNulstil").addEventListener("click", function () {
     $("fLand").value = ""; $("fBrand").value = ""; $("fSoeg").value = ""; $("fForael").checked = false;
     Array.prototype.forEach.call(document.querySelectorAll(".mtype"), function (c) { c.checked = true; });
