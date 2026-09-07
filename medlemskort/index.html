@@ -53,6 +53,13 @@
                color: #222; box-shadow: 0 1px 3px rgba(0,0,0,.18); white-space: nowrap; }
   .pin-label::before { display: none; }
   .leaflet-container:not(.zoomet) .pin-label { display: none; }
+  .gruppe-pin { width: 32px; height: 32px; border-radius: 50%; display: flex;
+                align-items: center; justify-content: center; cursor: pointer;
+                background: #2a81cb; color: #fff; font-size: 13px; font-weight: 700;
+                border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,.35); }
+  .gruppe-pin:hover { background: #1c6aad; }
+  .gruppe-pin.gruppe-hk { background: #2e9e4f; }
+  .gruppe-pin.gruppe-hk:hover { background: #26833f; }
   .lande-navn { display: flex; align-items: center; justify-content: center;
                 width: 100%; height: 100%; white-space: nowrap;
                 font-weight: 700; letter-spacing: .14em;
@@ -192,7 +199,8 @@ const CONFIG = {
     topojsonLib: "https://cdnjs.cloudflare.com/ajax/libs/topojson-client/3.1.0/topojson-client.min.js",
     enkeltPinZoom: 7,        // zoom når der kun er én afdeling og intet land kan bestemmes
     maksZoom:      9,        // kortet zoomer aldrig tættere på end dette af sig selv
-    faaAfdelinger: 20        // op til så mange afdelinger vises uden klynger og med navn på hver
+    faaAfdelinger: 20,       // op til så mange afdelinger vises uden klynger og med navn på hver
+    samlPx:        26        // pins tættere på hinanden end så mange pixels samles i én gruppe
 
   },
   /* --- Eksport: ret organisationsnavn og farve her --- */
@@ -289,16 +297,30 @@ function initKort() {
   kort.createPane("landepane");
   kort.getPane("landepane").style.zIndex = "350";
   kort.getPane("landepane").style.pointerEvents = "none";
-  cluster = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45 });
+  benRenderer = L.canvas({ pane: "landepane", padding: 0.5 });
+  /* Klynger bruges kun når der er mange afdelinger i visningen. Klik zoomer ind,
+     og er man helt inde ved sammenfaldende adresser, folder klyngen sig ud.
+     (spiderfyOnEveryZoom hjælper ikke: markercluster zoomer først og folder
+     bagefter ud et sted hvor klyngen ikke længere findes.) */
+  cluster = L.markerClusterGroup({
+    showCoverageOnHover: false, maxClusterRadius: 45, spiderfyOnMaxZoom: true
+  });
   kort.addLayer(cluster);
-  kort.on("zoomend", opdaterLabelSynlighed);
+  kort.on("zoomend", function () {
+    /* Gruppering afhænger af zoom – byg om og fold sammen igen */
+    if (simpelLag && !tvungenUdfold) { udfoldetIndeks = -1; opbygSimpel(); }
+    opdaterLabelSynlighed();
+  });
+  kort.on("click", function () {
+    if (simpelLag && udfoldetIndeks !== -1) { udfoldetIndeks = -1; opbygSimpel(); }
+  });
   opdaterLabelSynlighed();
 }
 function opdaterLabelSynlighed() {
   if (!kort) return;
   /* Navnene vises enten når man er zoomet tæt nok på, eller når der er så få
      afdelinger i visningen at de kan stå med navn uanset zoom. */
-  const faa = synligePins.length > 0 && synligePins.length <= CONFIG.kort.faaAfdelinger;
+  const faa = antalViste > 0 && antalViste <= CONFIG.kort.faaAfdelinger;
   const naer = kort.getZoom() >= CONFIG.labelZoom;
   kort.getContainer().classList.toggle("zoomet", faa || naer);
   /* Det store landenavn forsvinder først når man for alvor zoomer ind */
@@ -335,32 +357,132 @@ window.aabn = function (id) {
   try { ZOHO.CRM.UI.Record.open({ Entity: CONFIG.modul, RecordID: id }); } catch (e) { console.error(e); }
   return false;
 };
+function koordFor(r) {
+  const la = parseFloat(F(r, "lat")), lo = parseFloat(F(r, "lon"));
+  return (isNaN(la) || isNaN(lo)) ? null : L.latLng(la, lo);
+}
+function lavMarkoer(r, ll, tip) {
+  const m = L.marker(ll, { icon: erHovedkontor(r) ? ICON_HK : ICON_NORMAL });
+  m.bindPopup(popupHtml(r));
+  const label = medlemsNavn(r);
+  if (label) {
+    m.bindTooltip(esc(label), Object.assign({
+      permanent: true, direction: "top", offset: [0, -38], className: "pin-label", opacity: 1
+    }, tip || {}));
+  }
+  return m;
+}
+/* Ved udfoldning lægges navnet ud til den side pin'en peger, så de ikke overlapper */
+function tipRetning(vinkel) {
+  const cos = Math.cos(vinkel), sin = Math.sin(vinkel);
+  if (cos > 0.35)  return { direction: "right", offset: [12, -20] };
+  if (cos < -0.35) return { direction: "left",  offset: [-12, -20] };
+  if (sin < 0)     return { direction: "top",   offset: [0, -38] };
+  return { direction: "bottom", offset: [0, 4] };
+}
+
 function tegnMarkers(liste) {
   cluster.clearLayers();
   if (simpelLag) { kort.removeLayer(simpelLag); simpelLag = null; }
-  const pins = [];
-  let udenKoordinater = 0;
-  let antalHK = 0;
+  simpelPoster = [];
+  grupper = [];
+  udfoldetIndeks = -1;
+
+  const medKoord = [];
+  let udenKoordinater = 0, antalHK = 0;
   liste.forEach(function (r) {
-    const la = parseFloat(F(r, "lat")), lo = parseFloat(F(r, "lon"));
-    if (isNaN(la) || isNaN(lo)) { udenKoordinater++; return; }
-    const hk = erHovedkontor(r);
-    if (hk) antalHK++;
-    const m = L.marker([la, lo], { icon: hk ? ICON_HK : ICON_NORMAL });
-    m.bindPopup(popupHtml(r));
-    const label = medlemsNavn(r);
-    if (label) {
-      m.bindTooltip(esc(label), { permanent: true, direction: "top", offset: [0, -38], className: "pin-label", opacity: 1 });
-    }
-    pins.push(m);
+    if (!koordFor(r)) { udenKoordinater++; return; }
+    if (erHovedkontor(r)) antalHK++;
+    medKoord.push(r);
   });
-  synligePins = pins;
-  pinRamme = pins.length ? L.latLngBounds(pins.map(function (m) { return m.getLatLng(); })) : null;
-  /* Få afdelinger: vis dem enkeltvis med navn i stedet for som klynger */
-  if (pins.length && pins.length <= CONFIG.kort.faaAfdelinger) simpelLag = L.layerGroup(pins).addTo(kort);
-  else cluster.addLayers(pins);
+  antalViste = medKoord.length;
+  pinRamme = medKoord.length ? L.latLngBounds(medKoord.map(koordFor)) : null;
+
+  if (medKoord.length && medKoord.length <= CONFIG.kort.faaAfdelinger) {
+    /* Få afdelinger: hver sin pin med navn, og sammenfaldende adresser
+       samles i en klikbar gruppe der kan foldes ud. */
+    simpelPoster = medKoord;
+    simpelLag = L.layerGroup().addTo(kort);
+    opbygSimpel();
+  } else {
+    synligePins = medKoord.map(function (r) { return lavMarkoer(r, koordFor(r)); });
+    cluster.addLayers(synligePins);
+  }
   opdaterLabelSynlighed();
-  return { viste: pins.length, uden: udenKoordinater, hk: antalHK };
+  return { viste: medKoord.length, uden: udenKoordinater, hk: antalHK };
+}
+
+/* =====================================================================
+   SAMMENFALDENDE ADRESSER — flere medlemmer i samme by får tit præcis
+   samme koordinat, så pins lægger sig oven på hinanden. De samles i én
+   gruppe som kan foldes ud med et klik, og som altid foldes ud i eksporten.
+   ===================================================================== */
+function gruppeIkon(g) {
+  const harHK = g.poster.some(erHovedkontor);
+  return L.divIcon({
+    className: "",
+    html: '<div class="gruppe-pin' + (harHK ? " gruppe-hk" : "") + '">' + g.poster.length + "</div>",
+    iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -16]
+  });
+}
+function gruppeNavn(g) {
+  const brands = [];
+  g.poster.forEach(function (r) { const b = medlemsNavn(r); if (b && brands.indexOf(b) === -1) brands.push(b); });
+  const by = F(g.poster[0], "by");
+  if (brands.length === 1) return brands[0] + " (" + g.poster.length + ")";
+  return (by ? by + ": " : "") + g.poster.length + " afdelinger";
+}
+function byggGrupper(poster) {
+  const z = kort.getZoom(), ud = [];
+  poster.forEach(function (r) {
+    const ll = koordFor(r), p = kort.project(ll, z);
+    let fundet = null;
+    for (let i = 0; i < ud.length; i++) {
+      if (p.distanceTo(ud[i].p) <= CONFIG.kort.samlPx) { fundet = ud[i]; break; }
+    }
+    if (fundet) fundet.poster.push(r);
+    else ud.push({ p: p, ll: ll, poster: [r] });
+  });
+  return ud;
+}
+function opbygSimpel() {
+  if (!simpelLag) return;
+  /* Luk de faste labels før laget ryddes, så ingen bliver hængende på kortet */
+  simpelLag.eachLayer(function (l) { if (l.closeTooltip) l.closeTooltip(); });
+  simpelLag.clearLayers();
+  synligePins = [];
+  grupper = byggGrupper(simpelPoster);
+  const z = kort.getZoom();
+  grupper.forEach(function (g, i) {
+    if (g.poster.length === 1) {
+      const m = lavMarkoer(g.poster[0], g.ll);
+      synligePins.push(m); simpelLag.addLayer(m);
+      return;
+    }
+    if (tvungenUdfold || udfoldetIndeks === i) {
+      const n = g.poster.length, radius = Math.max(46, 15 * n);
+      g.poster.forEach(function (r, k) {
+        const v = (2 * Math.PI * k) / n - Math.PI / 2;
+        const ll2 = kort.unproject(L.point(g.p.x + radius * Math.cos(v), g.p.y + radius * Math.sin(v)), z);
+        simpelLag.addLayer(L.polyline([g.ll, ll2], {
+          pane: "landepane", renderer: benRenderer, interactive: false,
+          color: "#5b6b7d", weight: 1, opacity: .6
+        }));
+        const m = lavMarkoer(r, ll2, tipRetning(v));
+        synligePins.push(m); simpelLag.addLayer(m);
+      });
+    } else {
+      const m = L.marker(g.ll, { icon: gruppeIkon(g), title: "Klik for at folde de " + g.poster.length + " afdelinger ud" });
+      m.bindTooltip(esc(gruppeNavn(g)), { permanent: true, direction: "top", offset: [0, -20], className: "pin-label", opacity: 1 });
+      m.on("click", function (e) {
+        L.DomEvent.stopPropagation(e);
+        udfoldetIndeks = (udfoldetIndeks === i) ? -1 : i;
+        opbygSimpel();
+      });
+      synligePins.push(m); simpelLag.addLayer(m);
+    }
+  });
+  opdaterLabelSynlighed();
 }
 
 /* =====================================================================
@@ -371,7 +493,13 @@ function tegnMarkers(liste) {
 let udsnitOpgave = Promise.resolve();
 let landeLag = null;          /* omrids + landenavn */
 let simpelLag = null;         /* pins uden klynger, når der er få af dem */
+let simpelPoster = [];        /* de records der vises i den tilstand */
+let grupper = [];             /* sammenfaldende adresser */
+let udfoldetIndeks = -1;      /* hvilken gruppe brugeren har foldet ud */
+let tvungenUdfold = false;    /* alle grupper foldet ud (bruges ved eksport) */
+let benRenderer = null;       /* canvas til stregerne ud til de udfoldede pins */
 let synligePins = [];         /* markørerne i den aktuelle visning */
+let antalViste = 0;           /* antal afdelinger med koordinater i visningen */
 let pinRamme = null;          /* L.latLngBounds omkring dem */
 let landeRamme = null;        /* L.latLngBounds for landet, hvis kendt */
 let verdensdata = null;       /* cache af grænsedata */
@@ -421,8 +549,9 @@ async function opdaterUdsnit(liste) {
           const omrids = L.geoJSON(gj, {
             pane: "landepane", interactive: false,
             /* Canvas i stedet for SVG: html2canvas kan kopiere et canvas, men
-               gengiver ikke Leaflets SVG-lag korrekt i eksportbilledet. */
-            renderer: L.canvas({ pane: "landepane", padding: 0.5 }),
+               gengiver ikke Leaflets SVG-lag korrekt i eksportbilledet.
+               Samme canvas genbruges, så der ikke hobes lag op ved landeskift. */
+            renderer: benRenderer,
             style: { color: CONFIG.eksport.accentfarve, weight: 1.6, opacity: .55,
                      fillColor: CONFIG.eksport.accentfarve, fillOpacity: .06 }
           }).addTo(landeLag);
@@ -698,9 +827,11 @@ async function opsnapKort() {
   window.scrollTo(0, 0);
   try {
     await udsnitOpgave;                 /* evt. landeomrids skal være på plads først */
+    tvungenUdfold = true;               /* alle sammenfaldende adresser skal med på billedet */
     kort.invalidateSize({ animate: false });
     tilpasUdsnit();
     klemLodret();
+    opbygSimpel();
     opdaterLabelSynlighed();
     await ventPaaFliser();
     const canvas = await window.html2canvas(el, {
@@ -714,11 +845,13 @@ async function opsnapKort() {
     });
     return canvas;
   } finally {
+    tvungenUdfold = false;
     el.style.cssText = gemt.cssText;
     document.body.classList.remove("eksporterer");
     window.scrollTo(gemtScroll.x, gemtScroll.y);
     kort.invalidateSize({ animate: false });
     kort.setView(gemt.center, gemt.zoom, { animate: false });
+    opbygSimpel();
     opdaterLabelSynlighed();
   }
 }
