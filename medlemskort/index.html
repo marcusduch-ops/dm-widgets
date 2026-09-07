@@ -53,6 +53,12 @@
                color: #222; box-shadow: 0 1px 3px rgba(0,0,0,.18); white-space: nowrap; }
   .pin-label::before { display: none; }
   .leaflet-container:not(.zoomet) .pin-label { display: none; }
+  .lande-navn { display: flex; align-items: center; justify-content: center;
+                width: 100%; height: 100%; white-space: nowrap;
+                font-weight: 700; letter-spacing: .14em;
+                text-transform: uppercase; color: rgba(15, 63, 107, .34);
+                text-shadow: 0 1px 0 rgba(255,255,255,.65); pointer-events: none; }
+  .leaflet-container.naerzoom .lande-navn { display: none; }
   .ms { position: relative; }
   .ms > summary { list-style: none; cursor: pointer; padding: 6px 10px;
          border: 1px solid #c9c9c9; border-radius: 6px; background: #fff; font-size: 13px; user-select: none; }
@@ -166,6 +172,29 @@ const CONFIG = {
     medlemstypeFelt: "Medlemstype",
     alleMedlemstyper: ["DI - Ordinær", "Associeret", "Iværksættermedlem", "Støttemedlem"]
   },
+  /* --- Kortbaggrund og udsnit ---
+     Fliser: OpenStreetMap Standard er gratis og kræver ingen nøgle.
+     Vil du have skarpere landegrænser og mere læsbare landenavne, kan du skifte
+     til CARTO Voyager. Den kræver en gratis nøgle (ingen konto, 5 mio. fliser/md.,
+     erhvervsbrug tilladt) – hentes på https://carto.com/basemaps/apikey/ , og
+     nøglen sættes på URL'en efter vejledningen der. Uden nøgle lægger CARTO et
+     "API KEY REQUIRED"-vandmærke hen over kortet.
+       fliserUrl: "https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=DIN_NOEGLE",
+       fliserKredit: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-bidragydere &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'
+  */
+  kort: {
+    fliserUrl:    "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    fliserKredit: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-bidragydere',
+    fliserMaxZoom: 19,
+    visLandenavn:    true,   // stort, dæmpet landenavn når visningen er ét land
+    visLandegraense: true,   // omrids af landet (hentes fra CDN første gang)
+    graensedata: "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json",
+    topojsonLib: "https://cdnjs.cloudflare.com/ajax/libs/topojson-client/3.1.0/topojson-client.min.js",
+    enkeltPinZoom: 7,        // zoom når der kun er én afdeling og intet land kan bestemmes
+    maksZoom:      9,        // kortet zoomer aldrig tættere på end dette af sig selv
+    faaAfdelinger: 20        // op til så mange afdelinger vises uden klynger og med navn på hver
+
+  },
   /* --- Eksport: ret organisationsnavn og farve her --- */
   eksport: {
     organisation: "Danske Maritime",
@@ -248,12 +277,18 @@ function bekraeftStatus(rec) {
   return { harDato: true, foraeldet: alderDage > CONFIG.bekraeftGraenseDage, tekst: datoISO(d) };
 }
 function initKort() {
-  kort = L.map("kort", { worldCopyJump: true }).setView([25, 10], 2);
-  fliselag = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
+  /* zoomSnap 0.25: kortet må lande på kvarte zoomtrin, så et land udfylder
+     rammen bedre end de faste hele trin tillader. */
+  kort = L.map("kort", { worldCopyJump: true, zoomSnap: 0.25, zoomDelta: 1 }).setView([25, 10], 2);
+  fliselag = L.tileLayer(CONFIG.kort.fliserUrl, {
+    maxZoom: CONFIG.kort.fliserMaxZoom,
     crossOrigin: "anonymous",           /* nødvendigt for at kunne eksportere kortet som billede */
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-bidragydere'
+    attribution: CONFIG.kort.fliserKredit
   }).addTo(kort);
+  /* Eget lag mellem fliser og pins til landeomrids og landenavn */
+  kort.createPane("landepane");
+  kort.getPane("landepane").style.zIndex = "350";
+  kort.getPane("landepane").style.pointerEvents = "none";
   cluster = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45 });
   kort.addLayer(cluster);
   kort.on("zoomend", opdaterLabelSynlighed);
@@ -261,8 +296,13 @@ function initKort() {
 }
 function opdaterLabelSynlighed() {
   if (!kort) return;
-  const vis = kort.getZoom() >= CONFIG.labelZoom;
-  kort.getContainer().classList.toggle("zoomet", vis);
+  /* Navnene vises enten når man er zoomet tæt nok på, eller når der er så få
+     afdelinger i visningen at de kan stå med navn uanset zoom. */
+  const faa = synligePins.length > 0 && synligePins.length <= CONFIG.kort.faaAfdelinger;
+  const naer = kort.getZoom() >= CONFIG.labelZoom;
+  kort.getContainer().classList.toggle("zoomet", faa || naer);
+  /* Det store landenavn forsvinder først når man for alvor zoomer ind */
+  kort.getContainer().classList.toggle("naerzoom", naer);
 }
 function popupHtml(r) {
   const navn  = esc(F(r, "navn"));
@@ -297,6 +337,7 @@ window.aabn = function (id) {
 };
 function tegnMarkers(liste) {
   cluster.clearLayers();
+  if (simpelLag) { kort.removeLayer(simpelLag); simpelLag = null; }
   const pins = [];
   let udenKoordinater = 0;
   let antalHK = 0;
@@ -313,11 +354,102 @@ function tegnMarkers(liste) {
     }
     pins.push(m);
   });
-  cluster.addLayers(pins);
-  if (pins.length === 1) kort.setView(pins[0].getLatLng(), 9);
-  else if (pins.length > 1) kort.fitBounds(cluster.getBounds().pad(0.08));
+  synligePins = pins;
+  pinRamme = pins.length ? L.latLngBounds(pins.map(function (m) { return m.getLatLng(); })) : null;
+  /* Få afdelinger: vis dem enkeltvis med navn i stedet for som klynger */
+  if (pins.length && pins.length <= CONFIG.kort.faaAfdelinger) simpelLag = L.layerGroup(pins).addTo(kort);
+  else cluster.addLayers(pins);
   opdaterLabelSynlighed();
   return { viste: pins.length, uden: udenKoordinater, hk: antalHK };
+}
+
+/* =====================================================================
+   UDSNIT — når visningen kun rummer ét land, rammes hele landet ind
+   i stedet for kun de kontorer der ligger der. Ellers ville ét kontor
+   i Nigeria give et gadekort over Lagos.
+   ===================================================================== */
+let udsnitOpgave = Promise.resolve();
+let landeLag = null;          /* omrids + landenavn */
+let simpelLag = null;         /* pins uden klynger, når der er få af dem */
+let synligePins = [];         /* markørerne i den aktuelle visning */
+let pinRamme = null;          /* L.latLngBounds omkring dem */
+let landeRamme = null;        /* L.latLngBounds for landet, hvis kendt */
+let verdensdata = null;       /* cache af grænsedata */
+
+function landeIkon(navn, str) {
+  const b = 600, h = Math.round(str * 2);
+  return L.divIcon({
+    className: "",
+    html: '<div class="lande-navn" style="font-size:' + str + 'px">' + esc(navn) + "</div>",
+    iconSize: [b, h], iconAnchor: [b / 2, h / 2]
+  });
+}
+async function hentLandegraense(nummer) {
+  await indlaesScript(CONFIG.kort.topojsonLib);
+  if (!verdensdata) {
+    const svar = await fetch(CONFIG.kort.graensedata);
+    if (!svar.ok) throw new Error("Grænsedata svarede " + svar.status);
+    verdensdata = await svar.json();
+  }
+  const samling = window.topojson.feature(verdensdata, verdensdata.objects.countries);
+  const tal = parseInt(nummer, 10);
+  const fundet = samling.features.filter(function (f) { return parseInt(f.id, 10) === tal; });
+  if (!fundet.length) throw new Error("Landet findes ikke i grænsedataene: " + nummer);
+  return { type: "FeatureCollection", features: fundet };
+}
+
+/* Opdaterer landelaget og tilpasser udsnittet. Kaldes efter hver filtrering. */
+async function opdaterUdsnit(liste) {
+  if (landeLag) { kort.removeLayer(landeLag); landeLag = null; }
+  landeRamme = null;
+  const lande = landeIVisning(liste);
+  if (lande.length === 1) {
+    const d = findLand(lande[0]);
+    if (d) {
+      landeLag = L.layerGroup().addTo(kort);
+      landeRamme = L.latLngBounds([d.bb[1], d.bb[0]], [d.bb[3], d.bb[2]]);
+      if (CONFIG.kort.visLandenavn) {
+        L.marker([d.c[1], d.c[0]], {
+          icon: landeIkon(lande[0], 30), interactive: false, keyboard: false, pane: "landepane"
+        }).addTo(landeLag);
+      }
+      tilpasUdsnit();
+      if (CONFIG.kort.visLandegraense) {
+        try {
+          const gj = await hentLandegraense(d.nummer);
+          if (!landeLag) return;                       /* filteret er skiftet imens */
+          const omrids = L.geoJSON(gj, {
+            pane: "landepane", interactive: false,
+            /* Canvas i stedet for SVG: html2canvas kan kopiere et canvas, men
+               gengiver ikke Leaflets SVG-lag korrekt i eksportbilledet. */
+            renderer: L.canvas({ pane: "landepane", padding: 0.5 }),
+            style: { color: CONFIG.eksport.accentfarve, weight: 1.6, opacity: .55,
+                     fillColor: CONFIG.eksport.accentfarve, fillOpacity: .06 }
+          }).addTo(landeLag);
+          landeRamme = omrids.getBounds();
+        } catch (e) { console.warn("Landeomrids kunne ikke hentes:", e); }
+      }
+    } else {
+      console.info("Ukendt landenavn – kortet rammes ind efter kontorerne i stedet:", lande[0]);
+    }
+  }
+  tilpasUdsnit();
+}
+
+function tilpasUdsnit() {
+  let ramme = null;
+  if (landeRamme) ramme = L.latLngBounds(landeRamme.getSouthWest(), landeRamme.getNorthEast());
+  if (pinRamme) {
+    const pb = L.latLngBounds(pinRamme.getSouthWest(), pinRamme.getNorthEast());
+    ramme = ramme ? ramme.extend(pb) : pb;
+  }
+  if (!ramme || !ramme.isValid()) return;
+  if (ramme.getNorth() === ramme.getSouth() && ramme.getEast() === ramme.getWest()) {
+    kort.setView(ramme.getCenter(), CONFIG.kort.enkeltPinZoom, { animate: false });
+  } else {
+    kort.fitBounds(ramme.pad(0.08), { maxZoom: CONFIG.kort.maksZoom, animate: false });
+  }
+  opdaterLabelSynlighed();
 }
 function opdaterBund(res, ekstraTekst) {
   const bund = $("bund");
@@ -327,6 +459,108 @@ function opdaterBund(res, ekstraTekst) {
   if (res && res.uden > 0) html += "<span>" + res.uden + " uden koordinater vises ikke</span>";
   bund.innerHTML = html;
   bund.hidden = false;
+}
+
+/* =====================================================================
+   LANDEDATA — bruges til at ramme hele landet i stedet for kun kontorerne,
+   og til at skrive landets navn på kortet.
+   Format pr. land: "ISO2|ISO-nummer|navne (normaliserede, ; mellem)|vest,syd,oest,nord|laengde,bredde"
+   Rammen er landets hovedlandmasse (uden fjerne oversøiske dele), så fx
+   Frankrig ikke rammes ind fra Fransk Guyana til Ny Kaledonien.
+   Genereret fra Natural Earth (world-atlas 110m) og ISO 3166-navne på dansk og engelsk.
+   ===================================================================== */
+const LANDE = [
+  "AE|784|forenedearabiskeemirater;unitedarabemirates;uae;emiraterne;deforenedearabiskeemirater;dubai;abudhabi;ae;are|51.58,22.5,56.4,26.06|54.21,23.87","AF|004|afghanistan;af;afg|60.53,29.32,75.16,38.49|66.09,33.86",
+  "AL|008|albanien;albania;al;alb|19.31,39.63,21.02,42.69|20.03,41.14","AM|051|armenien;armenia;am;arm|43.58,38.74,46.51,41.25|45,40.22","AO|024|angola;ao;ago|11.64,-17.93,24.08,-5.86|17.5,-12.29",
+  "AQ|010|antarktis;antarctica;aq;ata|0.87,-85.61,359.77,-63.27|353.56,-82.58","AR|032|argentina;ar;arg|-73.41,-52.35,-53.63,-21.83|-65.15,-35.22","AT|040|oestrig;austria;at;aut|9.48,46.43,16.98,49.04|14.08,47.61",
+  "AU|036|australien;australia;au;aus|113.34,-39.04,153.57,-10.67|134.38,-25.56","AZ|031|aserbajdsjan;azerbaijan;az;aze|44.97,38.27,50.39,41.86|47.68,40.28",
+  "BA|070|bosnienhercegovina;bosniaandherzegovina;bosniaandherz;ba;bih|15.75,42.65,19.6,45.23|17.82,44.18","BD|050|bangladesh;bd;bgd|88.08,20.67,92.67,26.45|90.27,23.84",
+  "BE|056|belgien;belgium;be;bel|2.51,49.53,6.16,51.47|4.58,50.65","BF|854|burkinafaso;bf;bfa|-5.47,9.61,2.18,15.12|-1.78,12.31","BG|100|bulgarien;bulgaria;bg;bgr|22.38,41.23,28.56,44.24|25.19,42.75",
+  "BI|108|burundi;bi;bdi|29.03,-4.5,30.75,-2.35|29.91,-3.38","BJ|204|benin;bj;ben|0.77,6.14,3.8,12.24|2.34,9.65","BN|096|bruneidarussalam;brunei;bn;brn|114.21,4.01,115.45,5.45|114.92,4.69",
+  "BO|068|bolivia;bo;bol|-69.59,-22.87,-57.5,-9.76|-64.64,-16.73","BR|076|brasilien;brazil;brasil;br;bra|-73.99,-33.77,-34.73,5.24|-53.05,-10.81","BS|044|bahamas;bs;bhs|-78.41,23.71,-77.54,25.21|-77.92,24.51",
+  "BT|064|bhutan;bt;btn|88.81,26.72,92.11,28.3|90.47,27.43","BW|072|botswana;bw;bwa|19.9,-26.83,29.43,-17.66|23.77,-22.1","BY|112|hviderusland;belarus;by;blr|23.2,51.32,32.69,56.17|27.98,53.51",
+  "BZ|084|belize;bz;blz|-89.23,15.89,-88.11,18.5|-88.7,17.2","CA|124|canada;ca;can|-141,41.67,-55.68,71.92|-101.57,57.75","CD|180|demokratiskerepublikcongo;democraticrepublicofthecongo;demrepcongo;cd;cod|12.18,-13.26,31.17,5.26|23.58,-2.85",
+  "CF|140|dencentralafrikanskerepublik;centralafricanrepublic;centralafricanrep;cf;caf|14.46,2.27,27.37,11.14|20.37,6.54","CG|178|congo;republicofthecongo;cg;cog|11.09,-5.04,18.45,3.73|15.13,-0.84",
+  "CH|756|schweiz;switzerland;schweitz;ch;che|6.02,45.78,10.44,47.83|8.12,46.79","CI|384|elfenbenskysten;cotedivoire;ivorycoast;ci;civ|-8.6,4.34,-2.56,10.52|-5.61,7.55",
+  "CL|152|chile;cl;chl|-75.65,-53.86,-66.98,-17.58|-71.67,-37.34","CM|120|cameroun;cameroon;cm;cmr|8.49,1.73,16.01,12.86|12.61,5.66","CN|156|kina;peoplesrepublicofchina;china;folkerepublikkenkina;prc;cn;chn|73.68,20.28,135.02,53.46|103.87,36.61",
+  "CO|170|colombia;co;col|-78.99,-4.3,-66.88,12.44|-73.08,3.93","CR|188|costarica;cr;cri|-85.94,8.22,-82.55,11.22|-84.18,9.97","CU|192|cuba;cu;cub|-84.97,19.86,-74.18,23.19|-78.96,21.63",
+  "CY|196|cypern;cyprus;cy;cyp|32.26,34.57,34,35.17|33.04,34.91","CZ|203|tjekkiet;czechrepublic;czechia;dentjekkiskerepublik;cz;cze|12.24,48.56,18.85,51.12|15.33,49.78",
+  "DE|276|tyskland;germany;deutschland;de;deu|5.99,47.3,15.02,54.98|10.29,51.13","DJ|262|djibouti;dj;dji|41.66,10.93,43.32,12.7|42.5,11.77","DK|208|danmark;denmark;dk;dnk|8.09,54.83,10.91,57.73|9.31,56.22",
+  "DO|214|dominikanskerepublik;dominicanrepublic;dominicanrep;do;dom|-71.94,17.6,-68.32,19.88|-70.46,18.88","DZ|012|algeriet;algeria;dz;dza|-8.69,19.06,12,37.12|2.6,28.19",
+  "EC|218|ecuador;ec;ecu|-80.97,-4.96,-75.24,1.38|-78.38,-1.46","EE|233|estland;estonia;ee;est|23.34,57.47,28.13,59.61|25.83,58.64","EG|818|egypten;egypt;eg;egy|24.7,22,36.87,31.59|29.84,26.51",
+  "EH|732|vestsahara;westernsahara;wsahara;eh;esh|-17.06,21,-8.66,27.66|-12.14,24.29","ER|232|eritrea;er;eri|36.32,12.46,43.08,18|38.68,15.43","ES|724|spanien;spain;espana;es;esp|-9.39,35.95,3.04,43.75|-3.62,40.35",
+  "ET|231|etiopien;ethiopia;et;eth|32.95,3.42,47.79,14.96|39.55,8.65","FI|246|finland;suomi;fi;fin|20.64,59.85,31.52,70.16|26.21,64.5","FJ|242|fiji;fj;fji|178.6,-17.01,180.21,-16.02|179.41,-16.54",
+  "FK|238|falklandsoeerne;falklandislandsmalvinas;falklandis;fk;flk|-61.2,-52.3,-57.75,-51.1|-59.42,-51.71","FR|250|frankrig;france;fr;fra|-4.59,42.34,8.1,51.15|2.34,46.61",
+  "GA|266|gabon;ga;gab|8.8,-3.98,14.43,2.33|11.69,-0.65","GB|826|storbritannien;unitedkingdom;england;uk;greatbritain;storbritannienognordirland;skotland;wales;nordirland;gb;gbr|-6.15,49.96,1.68,58.63|-2.66,53.88",
+  "GE|268|georgien;georgia;ge;geo|39.95,41.06,46.64,43.55|43.48,42.16","GH|288|ghana;gh;gha|-3.25,4.71,1.06,11.1|-1.24,7.93","GL|304|groenland;greenland;gl;grl|-73.3,60.04,-12.21,83.65|-41.5,74.77",
+  "GM|270|gambia;republicofthegambia;gm;gmb|-16.84,13.13,-13.84,13.88|-15.43,13.48","GN|324|guinea;gn;gin|-15.13,7.31,-7.83,12.59|-11.06,10.45","GQ|226|aekvatorialguinea;equatorialguinea;eqguinea;gq;gnq|9.3,1.01,11.28,2.28|10.37,1.65",
+  "GR|300|graekenland;greece;hellas;gr;grc|20.15,36.41,26.6,41.83|22.56,39.34","GT|320|guatemala;gt;gtm|-92.23,13.74,-88.22,17.82|-90.37,15.7","GW|624|guineabissau;gw;gnb|-16.68,11.04,-13.7,12.63|-15.11,12.02",
+  "GY|328|guyana;gy;guy|-61.41,1.27,-56.54,8.37|-58.97,4.79","HN|340|honduras;hn;hnd|-89.35,12.98,-83.15,16.01|-86.59,14.82","HR|191|kroatien;croatia;hr;hrv|13.66,42.48,19.39,46.5|16.57,45.02",
+  "HT|332|haiti;ht;hti|-74.46,18.03,-71.62,19.92|-72.66,18.9","HU|348|ungarn;hungary;hu;hun|16.2,45.76,22.71,48.62|19.36,47.2","ID|360|indonesien;indonesia;id;idn|108.95,-4.11,119,4.31|114.02,-0.25",
+  "IE|372|irland;ireland;ie;irl|-9.98,51.67,-6.03,55.13|-8.01,53.18","IL|376|israel;il;isr|34.27,29.5,35.84,33.28|35,31.49","IN|356|indien;india;in;ind|68.18,7.97,97.4,35.49|79.59,22.92",
+  "IQ|368|irak;iraq;iq;irq|38.79,29.1,48.57,37.39|43.76,33.04","IR|364|iran;islamicrepublicofiran;ir;irn|44.11,25.08,63.32,39.71|54.29,32.52","IS|352|island;iceland;is;isl|-24.33,63.5,-13.61,66.53|-18.76,65.07",
+  "IT|380|italien;italy;italia;it;ita|6.75,37.91,18.48,47.11|12.22,43.47","JM|388|jamaica;jm;jam|-78.34,17.7,-76.2,18.52|-77.32,18.14","JO|400|jordan;jo;jor|34.92,29.2,39.2,33.38|36.78,31.25",
+  "JP|392|japan;jp;jpn|129.41,31.03,141.92,41.38|136.88,36.02","KE|404|kenya;ke;ken|33.89,-4.68,41.86,5.51|37.79,0.6","KG|417|kirgisistan;kyrgyzstan;kg;kgz|69.46,39.28,80.26,43.3|74.62,41.51",
+  "KH|116|cambodja;cambodia;kh;khm|102.35,10.49,107.61,14.57|104.88,12.68","KP|408|nordkorea;northkorea;kp;prk|124.26,37.67,130.78,42.98|127.16,40.14","KR|410|sydkorea;southkorea;korea;republikkenkorea;kr;kor|126.12,34.39,129.47,38.61|127.82,36.43",
+  "KW|414|kuwait;kw;kwt|46.57,28.53,48.42,30.06|47.6,29.31","KZ|398|kazakhstan;kz;kaz|46.47,40.66,87.36,55.38|67.28,48.19","LA|418|laos;laopeoplesdemocraticrepublic;la;lao|100.12,13.88,107.56,22.46|103.75,18.45",
+  "LB|422|libanon;lebanon;lb;lbn|35.13,33.09,36.61,34.65|35.87,33.91","LK|144|srilanka;lk;lka|79.7,5.97,81.79,9.82|80.67,7.7","LR|430|liberia;lr;lbr|-11.44,4.36,-7.54,8.54|-9.41,6.43",
+  "LS|426|lesotho;ls;lso|27,-30.64,29.32,-28.65|28.17,-29.63","LT|440|litauen;lithuania;lt;ltu|21.05,53.91,26.59,56.37|23.88,55.28","LU|442|luxembourg;lu;lux|5.68,49.44,6.24,50.13|5.97,49.77",
+  "LV|428|letland;latvia;lv;lva|21.05,55.61,28.18,57.97|24.83,56.81","LY|434|libyen;libya;ly;lby|9.32,19.58,25.17,33.14|17.97,27","MA|504|marokko;morocco;ma;mar|-17.02,21.42,-1.13,35.76|-8.42,29.89",
+  "MD|498|moldova;moldovarepublicof;md;mda|26.62,45.49,30.03,48.47|28.41,47.2","ME|499|montenegro;me;mne|18.45,41.88,20.34,43.52|19.29,42.79","MG|450|madagaskar;madagascar;mg;mdg|43.25,-25.6,50.48,-12.04|46.69,-19.36",
+  "MK|807|nordmakedonien;therepublicofnorthmacedonia;macedonia;mk;mkd|20.46,40.84,22.95,42.32|21.7,41.61","ML|466|mali;ml;mli|-12.17,10.1,4.27,24.97|-3.54,17.27",
+  "MM|104|myanmarburma;myanmar;burma;mm;mmr|92.3,9.93,101.18,28.34|96.51,21.02","MN|496|mongoliet;mongolia;mn;mng|87.75,41.6,119.77,52.05|102.95,46.82","MR|478|mauretanien;mauritania;mr;mrt|-17.06,14.62,-4.92,27.4|-10.33,20.21",
+  "MW|454|malawi;mw;mwi|32.69,-16.8,35.77,-9.23|34.19,-13.17","MX|484|mexico;mx;mex|-117.13,14.54,-86.81,32.72|-102.58,23.94","MY|458|malaysia;my;mys|109.66,0.77,119.18,6.93|114.68,3.55",
+  "MZ|508|mozambique;mz;moz|30.18,-26.74,40.78,-10.32|35.47,-17.23","NA|516|namibia;na;nam|11.73,-29.05,25.08,-16.94|17.16,-22.1","NC|540|nykaledonien;newcaledonia;nc;ncl|164.03,-22.4,167.12,-20.11|165.53,-21.26",
+  "NE|562|niger;ne;ner|0.3,11.66,15.9,23.47|9.33,17.35","NG|566|nigeria;ng;nga|2.69,4.24,14.58,13.87|8,9.55","NI|558|nicaragua;ni;nic|-87.67,10.73,-83.15,15.02|-85.02,12.85",
+  "NL|528|holland;netherlands;nederlandene;thenetherlands;nl;nld|3.31,50.8,7.09,53.51|5.51,52.3","NO|578|norge;norway;no;nor|4.99,58.08,31.29,71.19|14.24,64.54",
+  "NP|524|nepal;np;npl|80.09,26.4,88.17,30.42|84.01,28.24","NZ|554|newzealand;nz;nzl|166.51,-46.64,174.25,-40.49|170.51,-43.99","OM|512|oman;om;omn|52,16.65,59.81,24.93|56.1,20.58",
+  "PA|591|panama;pa;pan|-82.96,7.22,-77.24,9.61|-80.11,8.53","PE|604|peru;pe;per|-81.41,-18.35,-68.67,-0.06|-74.39,-9.19","PG|598|papuanyguinea;papuanewguinea;pg;png|141,-10.65,150.8,-2.6|144.33,-6.65",
+  "PH|608|filippinerne;philippines;ph;phl|119.88,12.54,124.18,18.51|121.54,15.75","PK|586|pakistan;pk;pak|60.87,23.69,77.84,37.13|69.41,29.97","PL|616|polen;poland;pl;pol|14.07,49.03,24.03,54.85|19.31,52.15",
+  "PR|630|puertorico;pr;pri|-67.24,17.95,-65.59,18.52|-66.48,18.24","PS|275|palaestina;stateofpalestine;palestine;ps;pse|34.93,31.35,35.54,32.53|35.27,31.94",
+  "PT|620|portugal;pt;prt|-9.53,36.84,-6.39,42.28|-8.06,39.63","PY|600|paraguay;py;pry|-62.69,-27.55,-54.29,-19.34|-58.39,-23.25","QA|634|qatar;qa;qat|50.74,24.56,51.61,26.12|51.18,25.32",
+  "RO|642|rumaenien;romania;ro;rou|20.22,43.69,29.63,48.22|24.94,45.86","RS|688|serbien;serbia;rs;srb|18.83,42.25,22.98,46.17|20.82,44.23","RU|643|rusland;russianfederation;russia;denrussiskefoederation;ru;rus|27.29,41.15,190.1,77.7|99.89,61.73",
+  "RW|646|rwanda;rw;rwa|29.03,-2.92,30.81,-1.14|29.92,-2.01","SA|682|saudiarabien;saudiarabia;sa;sau|34.63,16.35,55.67,32.16|44.52,24.12","SB|090|salomonoeerne;solomonislands;solomonis;sb;slb|158.21,-8.54,159.92,-7.32|159.1,-7.9",
+  "SD|729|sudan;sd;sdn|21.94,8.23,38.41,22|29.86,15.99","SE|752|sverige;sweden;se;swe|11.03,55.36,23.9,69.11|16.6,62.81","SI|705|slovenien;slovenia;si;svn|13.7,45.45,16.57,46.85|14.94,46.13",
+  "SK|703|slovakiet;slovakia;sk;svk|16.88,47.76,22.56,49.57|19.51,48.73","SL|694|sierraleone;sl;sle|-13.25,6.79,-10.23,10.05|-11.8,8.53","SN|686|senegal;sn;sen|-17.62,12.33,-11.47,16.6|-14.51,14.35",
+  "SO|706|somalia;so;som|40.98,-1.68,51.13,12.02|45.73,4.75","SR|740|surinam;suriname;sr;sur|-58.05,1.82,-53.96,6.03|-55.91,4.12","SS|728|sydsudan;southsudan;ssudan;ss;ssd|23.89,3.51,35.3,12.25|30.2,7.29",
+  "SV|222|elsalvador;sv;slv|-90.1,13.15,-87.72,14.42|-88.87,13.73","SY|760|syrien;syrianarabrepublic;syria;sy;syr|35.7,32.31,42.35,37.23|38.54,35.01","SZ|748|eswatini;sz;swz|30.68,-27.29,32.07,-25.66|31.4,-26.49",
+  "TD|148|tchad;chad;td;tcd|13.54,7.42,23.89,23.41|18.58,15.33","TF|260|franskesydterritorier;frenchsouthernterritories;frsantarcticlands;tf;atf|68.72,-49.77,70.56,-48.62|69.53,-49.31",
+  "TG|768|togo;tg;tgo|-0.05,5.93,1.87,11.02|1,8.44","TH|764|thailand;th;tha|97.38,5.69,105.59,20.42|101.01,15.02","TJ|762|tadsjikistan;tajikistan;tj;tjk|67.44,36.74,74.98,40.96|71.03,38.58",
+  "TL|626|oesttimor;timorleste;tl;tls|124.97,-9.39,127.34,-8.27|125.97,-8.77","TM|795|turkmenistan;tm;tkm|52.5,35.27,66.54,42.75|59.28,39.09","TN|788|tunesien;tunisia;tn;tun|7.53,30.31,11.49,37.35|9.53,34.17",
+  "TR|792|tyrkiet;turkiye;turkey;tr;tur|26.17,35.82,44.79,42.04|35.39,38.99","TT|780|trinidadogtobago;trinidadandtobago;tt;tto|-61.95,10,-60.9,10.89|-61.33,10.43",
+  "TW|158|republikkenkinataiwan;taiwanprovinceofchina;taiwan;chinesetaipei;tw;twn|120.11,21.97,121.95,25.3|120.97,23.74","TZ|834|tanzania;unitedrepublicoftanzania;tz;tza|29.34,-11.72,40.32,-0.95|34.75,-6.26",
+  "UA|804|ukraine;ua;ukr|22.08,45.29,40.08,52.33|31.23,49.15","UG|800|uganda;ug;uga|29.58,-1.44,35.04,4.25|32.36,1.3","US|840|usa;unitedstatesofamerica;unitedstates;amerikasforenedestater;us;forenedestater|-124.69,25.08,-66.97,49.39|-99.06,39.5",
+  "UY|858|uruguay;uy;ury|-58.43,-34.95,-53.21,-30.11|-56,-32.78","UZ|860|usbekistan;uzbekistan;uz;uzb|55.93,37.15,73.05,45.59|63.2,41.75","VE|862|venezuela;ve;ven|-73.31,0.72,-59.76,12.16|-66.16,7.16",
+  "VN|704|vietnam;vn;vnm|102.17,8.6,109.33,23.35|106.29,16.66","VU|548|vanuatu;vu;vut|166.63,-15.74,167.27,-14.63|166.91,-15.22","YE|887|yemen;ye;yem|42.6,12.59,53.11,19|47.54,15.91",
+  "ZA|710|sydafrika;southafrica;za;zaf|16.35,-34.82,32.83,-22.09|25.12,-28.96","ZM|894|zambia;zm;zmb|21.89,-17.96,33.49,-8.24|27.73,-13.4","ZW|716|zimbabwe;zw;zwe|25.26,-22.27,32.85,-15.51|29.79,-18.91",
+];
+let landeIndeks = null;
+function normLand(s) {
+  return String(s == null ? "" : s).toLowerCase()
+    .replace(/\u00e6/g, "ae").replace(/\u00f8/g, "oe").replace(/\u00e5/g, "aa")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+function byggLandeIndeks() {
+  landeIndeks = {};
+  LANDE.forEach(function (linje) {
+    const d = linje.split("|");
+    const post = {
+      iso2: d[0], nummer: d[1],
+      bb: d[3].split(",").map(Number),
+      c:  d[4].split(",").map(Number)
+    };
+    d[2].split(";").forEach(function (n) { if (n && !landeIndeks[n]) landeIndeks[n] = post; });
+  });
+}
+function findLand(navn) {
+  if (!landeIndeks) byggLandeIndeks();
+  return landeIndeks[normLand(navn)] || null;
+}
+function landeIVisning(liste) {
+  const s = {};
+  liste.forEach(function (r) { const l = F(r, "land"); if (l) s[l] = true; });
+  return Object.keys(s);
 }
 
 /* =====================================================================
@@ -463,12 +697,9 @@ async function opsnapKort() {
   el.style.cssText = "position:relative;flex:none;width:" + B + "px;height:" + H + "px;margin:0;";
   window.scrollTo(0, 0);
   try {
+    await udsnitOpgave;                 /* evt. landeomrids skal være på plads først */
     kort.invalidateSize({ animate: false });
-    if (cluster.getLayers().length === 1) {
-      kort.setView(cluster.getLayers()[0].getLatLng(), 9, { animate: false });
-    } else if (cluster.getLayers().length > 1) {
-      kort.fitBounds(cluster.getBounds().pad(0.08), { animate: false });
-    }
+    tilpasUdsnit();
     klemLodret();
     opdaterLabelSynlighed();
     await ventPaaFliser();
@@ -896,6 +1127,7 @@ function startMedlemstilstand() {
   $("filterbar").classList.add("kun-eksport");
   opsaetEksportknapper();
   const res = tegnMarkers(liste);
+  udsnitOpgave = opdaterUdsnit(liste);
   const navnetekst = tilstand.brands.length ? tilstand.brands.join(", ") : tilstand.kontoNavn;
   $("taeller").textContent = res.viste + " lokation(er)";
   opdaterBund(res, "Viser " + res.viste + " lokation(er) for " + navnetekst);
@@ -947,6 +1179,7 @@ function anvendFilter() {
   });
   synligListe = liste;
   const res = tegnMarkers(liste);
+  udsnitOpgave = opdaterUdsnit(liste);
   $("taeller").textContent = res.viste + " af " + alleRecords.length + " afdelinger";
   opdaterBund(res, res.hk + " hovedkontorer");
 }
