@@ -23,7 +23,7 @@
   .knap-excel { background: #eef4fb; border-color: #bcd3ee; color: #1c1c1c; font-weight: 600; }
   .knap-excel:hover { background: #e0ecf9; }
   #taeller { font-size: 12.5px; color: #555; margin-left: auto; }
-  #kort { flex: 1; min-height: 260px; }
+  #kort { flex: 1; min-height: 260px; background: #e9edf1; }
   .besked { padding: 14px 16px; font-size: 14px; background: #fff7e6;
             color: #7a4b00; border-bottom: 1px solid #f0dcb4; }
   .besked.fejl { background: #fdecec; color: #8a1f1f; border-color: #f2c4c4; }
@@ -63,6 +63,34 @@
          box-shadow: 0 4px 14px rgba(0,0,0,.12); min-width: 200px; }
   .ms-panel label { display: flex; align-items: center; gap: 6px; font-size: 13px;
          padding: 3px 0; white-space: nowrap; cursor: pointer; }
+
+  /* ---------- Eksport ---------- */
+  #eksportGruppe { display: flex; gap: 8px; align-items: center; }
+  .ms-eksport > summary { background: #eef4fb; border-color: #bcd3ee; font-weight: 600; }
+  .ms-eksport > summary:hover { background: #e0ecf9; }
+  .ms-eksport .ms-panel { min-width: 260px; padding: 6px; }
+  .eks-valg { display: block; width: 100%; text-align: left; border: 0; background: #fff;
+        padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #1c1c1c; }
+  .eks-valg:hover { background: #f0f4fa; }
+  .eks-valg strong { display: block; font-size: 13px; font-weight: 600; }
+  .eks-valg span { display: block; font-size: 11.5px; color: #666; margin-top: 1px; }
+  .eks-valg[disabled] { opacity: .5; cursor: default; }
+  /* Skjul filterfelterne når baren kun bruges til eksport (medlemsvisning) */
+  .top.kun-eksport > *:not(#eksportGruppe):not(#taeller) { display: none; }
+  /* Under opsnapning: kortet står alene øverst i dokumentet, så billedet bliver præcist */
+  body.eksporterer { display: block; height: auto; overflow: visible; }
+  body.eksporterer #filterbar,
+  body.eksporterer #besked,
+  body.eksporterer #bund { display: none !important; }
+  .eksporterer .leaflet-control-container { display: none !important; }
+  .eksporterer .leaflet-popup { display: none !important; }
+  #eksportSkaerm { position: fixed; inset: 0; z-index: 100000;
+        background: rgba(255,255,255,.94); display: flex; align-items: center;
+        justify-content: center; flex-direction: column; gap: 10px;
+        font-size: 14px; color: #333; }
+  #eksportSkaerm .spin { width: 26px; height: 26px; border: 3px solid #d6e2f0;
+        border-top-color: #2a81cb; border-radius: 50%; animation: snurr .8s linear infinite; }
+  @keyframes snurr { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -78,12 +106,32 @@
     <input type="checkbox" id="fForael"> Kun forældede
   </label>
   <button id="fNulstil" type="button">Nulstil</button>
-  <button id="fExcel" type="button" class="knap knap-excel">⬇ Eksportér denne visning til Excel</button>
+  <div id="eksportGruppe">
+    <button id="fExcel" type="button" class="knap knap-excel">⬇ Excel</button>
+    <details class="ms ms-eksport" id="msEksport">
+      <summary>⬇ Eksportér visning</summary>
+      <div class="ms-panel">
+        <button class="eks-valg" id="eksPng" type="button">
+          <strong>Billede (PNG)</strong>
+          <span>Kort med titel og signatur – til PowerPoint og mail</span>
+        </button>
+        <button class="eks-valg" id="eksPdf" type="button">
+          <strong>Rapport (PDF)</strong>
+          <span>Kort på side 1 + afdelingsliste bagefter</span>
+        </button>
+        <button class="eks-valg" id="eksPptx" type="button">
+          <strong>PowerPoint (PPTX)</strong>
+          <span>Redigerbar slide med kort og nøgletal</span>
+        </button>
+      </div>
+    </details>
+  </div>
   <span id="taeller"></span>
 </div>
 <div class="besked" id="besked" hidden></div>
 <div id="kort"></div>
 <div class="bund" id="bund" hidden></div>
+
 <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
@@ -117,10 +165,25 @@ const CONFIG = {
     navnFelt:        "Account_Name",
     medlemstypeFelt: "Medlemstype",
     alleMedlemstyper: ["DI - Ordinær", "Associeret", "Iværksættermedlem", "Støttemedlem"]
+  },
+  /* --- Eksport: ret organisationsnavn og farve her --- */
+  eksport: {
+    organisation: "Danske Maritime",
+    accentfarve:  "#0f3f6b",
+    kortBredde:   1400,   // px – kortets størrelse under opsnapning
+    kortHoejde:    850,
+    skala:           2,   // 2 = dobbelt opløsning (skarpt i print)
+    maxTabelRaekker: 400  // sikkerhedsgrænse for tabelbilaget
+  },
+  cdn: {
+    html2canvas: "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
+    jspdf:       "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
+    pptxgen:     "https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js"
   }
 };
 /* ===================================================================== */
-let kort, cluster;
+
+let kort, cluster, fliselag;
 let alleRecords = [];
 let kontoMap = {};
 let synligListe = [];
@@ -172,6 +235,10 @@ function medlemstypeForAfd(r) {
 function toCifre(n) { return (n < 10 ? "0" : "") + n; }
 function datoISO(d) { return d.getFullYear() + "-" + toCifre(d.getMonth() + 1) + "-" + toCifre(d.getDate()); }
 function idagISO() { return datoISO(new Date()); }
+function datoDansk(d) {
+  const m = ["januar","februar","marts","april","maj","juni","juli","august","september","oktober","november","december"];
+  return d.getDate() + ". " + m[d.getMonth()] + " " + d.getFullYear();
+}
 function bekraeftStatus(rec) {
   const raa = F(rec, "bekraeftet");
   if (!raa) return { harDato: false, foraeldet: true, tekst: "aldrig bekræftet" };
@@ -182,8 +249,9 @@ function bekraeftStatus(rec) {
 }
 function initKort() {
   kort = L.map("kort", { worldCopyJump: true }).setView([25, 10], 2);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  fliselag = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
+    crossOrigin: "anonymous",           /* nødvendigt for at kunne eksportere kortet som billede */
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-bidragydere'
   }).addTo(kort);
   cluster = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45 });
@@ -260,6 +328,495 @@ function opdaterBund(res, ekstraTekst) {
   bund.innerHTML = html;
   bund.hidden = false;
 }
+
+/* =====================================================================
+   EKSPORT — billede, PDF og PowerPoint af den aktuelle visning
+   ===================================================================== */
+
+/* Henter et bibliotek første gang det bruges (holder widget'en let). */
+const indlaesteScripts = {};
+function indlaesScript(url) {
+  if (indlaesteScripts[url]) return indlaesteScripts[url];
+  indlaesteScripts[url] = new Promise(function (ok, fejl) {
+    const s = document.createElement("script");
+    s.src = url; s.async = true;
+    s.onload = function () { ok(); };
+    s.onerror = function () { indlaesteScripts[url] = null; fejl(new Error("Kunne ikke hente " + url)); };
+    document.head.appendChild(s);
+  });
+  return indlaesteScripts[url];
+}
+
+function visEksportSkaerm(tekst) {
+  let el = $("eksportSkaerm");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "eksportSkaerm";
+    el.innerHTML = '<div class="spin"></div><div id="eksportSkaermTekst"></div>';
+    document.body.appendChild(el);
+  }
+  el.style.display = "flex";
+  $("eksportSkaermTekst").textContent = tekst || "Forbereder eksport …";
+}
+function skjulEksportSkaerm() { const el = $("eksportSkaerm"); if (el) el.style.display = "none"; }
+
+/* Beskriver hvilket filter brugeren står på lige nu. */
+function eksportOverskrift() {
+  const dato = new Date();
+  const antal = synligListe.length;
+  let antalHK = 0, udenKoord = 0;
+  synligListe.forEach(function (r) {
+    if (erHovedkontor(r)) antalHK++;
+    if (isNaN(parseFloat(F(r, "lat"))) || isNaN(parseFloat(F(r, "lon")))) udenKoord++;
+  });
+  const lande = Array.from(new Set(synligListe.map(function (r) { return F(r, "land"); }).filter(Boolean)));
+
+  let titel, filnavnDel;
+  const filtre = [];
+
+  if (tilstand.mode === "medlem") {
+    const navn = tilstand.brands.length ? tilstand.brands.join(", ") : (tilstand.kontoNavn || "medlem");
+    titel = "Afdelinger – " + navn;
+    filnavnDel = navn;
+  } else {
+    const land  = $("fLand") ? $("fLand").value : "";
+    const brand = $("fBrand") ? $("fBrand").value : "";
+    const soeg  = $("fSoeg") ? $("fSoeg").value.trim() : "";
+    const kunForael = $("fForael") ? $("fForael").checked : false;
+    const mtyper = valgteMedlemstyper();
+    const alleMt = mtyper.length === CONFIG.konto.alleMedlemstyper.length;
+
+    if (land && brand) titel = "Afdelingskort – " + brand + " i " + land;
+    else if (land)     titel = "Afdelingskort – " + land;
+    else if (brand)    titel = "Afdelingskort – " + brand;
+    else               titel = "Afdelingskort – alle lande";
+    filnavnDel = land || brand || "alle";
+
+    if (land)  filtre.push("Land: " + land);
+    if (brand) filtre.push("Virksomhed: " + brand);
+    if (!alleMt) filtre.push("Medlemstype: " + mtyper.join(", "));
+    if (kunForael) filtre.push("Kun forældede oplysninger");
+    if (soeg) filtre.push("Søgning: ‚" + soeg + "’");
+  }
+
+  const noegletal = [];
+  noegletal.push(antal + (antal === 1 ? " afdeling" : " afdelinger"));
+  if (antalHK) noegletal.push(antalHK + (antalHK === 1 ? " dansk hovedkontor" : " danske hovedkontorer"));
+  if (!$("fLand") || !$("fLand").value) noegletal.push(lande.length + (lande.length === 1 ? " land" : " lande"));
+
+  const undertitel = noegletal.join(" · ") + (filtre.length ? "   |   " + filtre.join(" · ") : "");
+
+  return {
+    titel: titel,
+    undertitel: undertitel,
+    filtre: filtre,
+    noegletal: noegletal,
+    antal: antal, antalHK: antalHK, lande: lande, udenKoord: udenKoord,
+    dato: dato,
+    datoTekst: datoDansk(dato),
+    filnavn: "afdelingskort_" + slug(filnavnDel) + "_" + idagISO()
+  };
+}
+function slug(s) {
+  return String(s || "kort").toLowerCase()
+    .replace(/æ/g, "ae").replace(/ø/g, "oe").replace(/å/g, "aa")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "kort";
+}
+
+/* Undgår grå bjælke over/under verdenskortet når udsnittet er højere end kortdataene. */
+function klemLodret() {
+  const z = kort.getZoom(), st = kort.getSize();
+  const nord = kort.project(L.latLng(85.0511, 0), z).y;
+  const syd  = kort.project(L.latLng(-85.0511, 0), z).y;
+  if (syd - nord <= st.y) return;
+  const c = kort.project(kort.getCenter(), z);
+  const min = nord + st.y / 2, max = syd - st.y / 2;
+  const y = Math.min(Math.max(c.y, min), max);
+  if (Math.abs(y - c.y) > 0.5) kort.setView(kort.unproject(L.point(c.x, y), z), z, { animate: false });
+}
+
+/* Venter til alle kortfliser er hentet, så billedet ikke bliver gråt. */
+function ventPaaFliser(maxMs) {
+  return new Promise(function (ok) {
+    let faerdig = false;
+    const afslut = function () { if (faerdig) return; faerdig = true; setTimeout(ok, 300); };
+    const t = setTimeout(function () { faerdig = true; ok(); }, maxMs || 9000);
+    const naar = function () { clearTimeout(t); afslut(); };
+    if (!fliselag || !fliselag._loading) { clearTimeout(t); afslut(); return; }
+    fliselag.once("load", naar);
+  });
+}
+
+/* Sætter kortet op i fast eksportstørrelse, tager billedet, og stiller alt tilbage. */
+async function opsnapKort() {
+  await indlaesScript(CONFIG.cdn.html2canvas);
+  const el = $("kort");
+  const B = CONFIG.eksport.kortBredde, H = CONFIG.eksport.kortHoejde;
+  const gemt = {
+    cssText: el.style.cssText,
+    center: kort.getCenter(),
+    zoom: kort.getZoom()
+  };
+  kort.closePopup();
+  const gemtScroll = { x: window.scrollX, y: window.scrollY };
+  document.body.classList.add("eksporterer");
+  el.style.cssText = "position:relative;flex:none;width:" + B + "px;height:" + H + "px;margin:0;";
+  window.scrollTo(0, 0);
+  try {
+    kort.invalidateSize({ animate: false });
+    if (cluster.getLayers().length === 1) {
+      kort.setView(cluster.getLayers()[0].getLatLng(), 9, { animate: false });
+    } else if (cluster.getLayers().length > 1) {
+      kort.fitBounds(cluster.getBounds().pad(0.08), { animate: false });
+    }
+    klemLodret();
+    opdaterLabelSynlighed();
+    await ventPaaFliser();
+    const canvas = await window.html2canvas(el, {
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      logging: false,
+      scale: CONFIG.eksport.skala,
+      width: B, height: H,
+      windowWidth: B, windowHeight: H,
+      scrollX: 0, scrollY: 0
+    });
+    return canvas;
+  } finally {
+    el.style.cssText = gemt.cssText;
+    document.body.classList.remove("eksporterer");
+    window.scrollTo(gemtScroll.x, gemtScroll.y);
+    kort.invalidateSize({ animate: false });
+    kort.setView(gemt.center, gemt.zoom, { animate: false });
+    opdaterLabelSynlighed();
+  }
+}
+
+/* Tegner titelbjælke, signaturforklaring og kildeangivelse omkring kortbilledet. */
+function indramKort(kortCanvas, info) {
+  const s = CONFIG.eksport.skala;
+  const topH = 78 * s, bundH = 44 * s, kant = 1 * s;
+  const c = document.createElement("canvas");
+  c.width = kortCanvas.width + kant * 2;
+  c.height = kortCanvas.height + topH + bundH + kant * 2;
+  const g = c.getContext("2d");
+
+  g.fillStyle = "#ffffff"; g.fillRect(0, 0, c.width, c.height);
+
+  /* Titelbjælke */
+  g.fillStyle = CONFIG.eksport.accentfarve;
+  g.fillRect(0, 0, c.width, topH);
+  g.fillStyle = "#ffffff";
+  g.font = "600 " + (23 * s) + "px -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
+  g.textBaseline = "alphabetic";
+  g.fillText(info.titel, 20 * s, 33 * s);
+  g.fillStyle = "rgba(255,255,255,.82)";
+  g.font = (13 * s) + "px -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
+  g.fillText(info.undertitel, 20 * s, 55 * s);
+  g.font = "600 " + (13 * s) + "px -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
+  g.textAlign = "right";
+  g.fillStyle = "rgba(255,255,255,.92)";
+  g.fillText(CONFIG.eksport.organisation, c.width - 20 * s, 33 * s);
+  g.font = (12 * s) + "px -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
+  g.fillStyle = "rgba(255,255,255,.75)";
+  g.fillText(info.datoTekst, c.width - 20 * s, 53 * s);
+  g.textAlign = "left";
+
+  /* Kortbilledet */
+  g.drawImage(kortCanvas, kant, topH + kant);
+  g.strokeStyle = "#d8dee6"; g.lineWidth = kant;
+  g.strokeRect(kant / 2, topH + kant / 2, c.width - kant, kortCanvas.height + kant);
+
+  /* Bundbjælke med signaturforklaring */
+  const by = topH + kortCanvas.height + kant * 2;
+  g.fillStyle = "#f7f9fb"; g.fillRect(0, by, c.width, bundH);
+  g.strokeStyle = "#e3e7ec"; g.lineWidth = kant;
+  g.beginPath(); g.moveTo(0, by + kant / 2); g.lineTo(c.width, by + kant / 2); g.stroke();
+
+  let x = 20 * s;
+  const midt = by + bundH / 2;
+  const prik = function (farve, tekst) {
+    g.beginPath(); g.arc(x + 6 * s, midt, 6 * s, 0, Math.PI * 2);
+    g.fillStyle = farve; g.fill();
+    g.strokeStyle = "rgba(0,0,0,.25)"; g.lineWidth = 1 * s; g.stroke();
+    x += 18 * s;
+    g.fillStyle = "#444";
+    g.font = (13 * s) + "px -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
+    g.textBaseline = "middle";
+    g.fillText(tekst, x, midt);
+    x += g.measureText(tekst).width + 26 * s;
+  };
+  prik("#2a81cb", "Afdeling");
+  prik("#2e9e4f", "Dansk hovedkontor");
+  if (info.udenKoord > 0) {
+    g.fillStyle = "#8a6d1f";
+    g.fillText(info.udenKoord + " uden koordinater vises ikke", x, midt);
+  }
+  g.textAlign = "right";
+  g.fillStyle = "#777";
+  g.font = (11.5 * s) + "px -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
+  g.fillText("Kilde: " + CONFIG.eksport.organisation + "s CRM · Kortdata © OpenStreetMap-bidragydere",
+             c.width - 20 * s, midt);
+  g.textAlign = "left"; g.textBaseline = "alphabetic";
+  return c;
+}
+
+function hentTabeldata() {
+  const kol = ["Afdeling", "Virksomhed", "Type", "Land", "By", "Adresse", "Sidst bekræftet"];
+  const raekker = synligListe.slice(0, CONFIG.eksport.maxTabelRaekker).map(function (r) {
+    const b = bekraeftStatus(r);
+    return [
+      F(r, "navn") || "",
+      F(r, "brand") || medlemsNavn(r) || "",
+      erHovedkontor(r) ? "Hovedkontor" : (F(r, "afdelingstype") || "Afdeling"),
+      F(r, "land") || "",
+      [F(r, "postnr"), F(r, "by")].filter(Boolean).join(" "),
+      F(r, "adresse") || "",
+      b.harDato ? b.tekst : "—"
+    ];
+  });
+  return { kolonner: kol, raekker: raekker, afkortet: synligListe.length > CONFIG.eksport.maxTabelRaekker };
+}
+
+function gemBlob(blob, filnavn) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filnavn;
+  document.body.appendChild(a); a.click();
+  setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+}
+
+function tjekVisning() {
+  if (!synligListe || synligListe.length === 0) {
+    visBesked("Der er ingen afdelinger at eksportere i den aktuelle visning.", true);
+    return false;
+  }
+  const medKoord = synligListe.filter(function (r) {
+    return !isNaN(parseFloat(F(r, "lat"))) && !isNaN(parseFloat(F(r, "lon")));
+  });
+  if (medKoord.length === 0) {
+    visBesked("Ingen af afdelingerne i visningen har koordinater, så kortet kan ikke eksporteres.", true);
+    return false;
+  }
+  return true;
+}
+
+async function eksporterPng() {
+  if (!tjekVisning()) return;
+  visEksportSkaerm("Tegner kortet …");
+  try {
+    const info = eksportOverskrift();
+    const kortC = await opsnapKort();
+    const helC = indramKort(kortC, info);
+    await new Promise(function (ok) {
+      helC.toBlob(function (blob) { gemBlob(blob, info.filnavn + ".png"); ok(); }, "image/png");
+    });
+    skjulBesked();
+  } catch (e) { eksportFejl(e); } finally { skjulEksportSkaerm(); }
+}
+
+async function eksporterPdf() {
+  if (!tjekVisning()) return;
+  visEksportSkaerm("Bygger PDF …");
+  try {
+    const info = eksportOverskrift();
+    await indlaesScript(CONFIG.cdn.jspdf);
+    const kortC = await opsnapKort();
+    const jsPDFklasse = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    const doc = new jsPDFklasse({ orientation: "landscape", unit: "mm", format: "a4" });
+    const S = { b: 297, h: 210, m: 12 };
+    const accent = CONFIG.eksport.accentfarve;
+
+    /* --- Side 1: kortet --- */
+    doc.setFillColor(accent);
+    doc.rect(0, 0, S.b, 22, "F");
+    doc.setTextColor("#ffffff");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(15);
+    doc.text(info.titel, S.m, 10.5);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    doc.setTextColor("#dbe6f0");
+    doc.text(info.undertitel, S.m, 17);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+    doc.setTextColor("#ffffff");
+    doc.text(CONFIG.eksport.organisation, S.b - S.m, 10.5, { align: "right" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
+    doc.setTextColor("#dbe6f0");
+    doc.text(info.datoTekst, S.b - S.m, 16.5, { align: "right" });
+
+    const omraadeB = S.b - S.m * 2;
+    const omraadeH = S.h - 22 - 8 - 16;
+    const skala = Math.min(omraadeB / kortC.width, omraadeH / kortC.height);
+    const bB = kortC.width * skala, bH = kortC.height * skala;
+    const bX = (S.b - bB) / 2, bY = 22 + 6 + Math.max(0, (omraadeH - bH) / 2);
+    doc.addImage(kortC.toDataURL("image/jpeg", 0.92), "JPEG", bX, bY, bB, bH);
+    doc.setDrawColor("#d8dee6"); doc.setLineWidth(0.3);
+    doc.rect(bX, bY, bB, bH);
+
+    /* Signatur + kilde */
+    let ly = bY + bH + 7;
+    doc.setFillColor("#2a81cb"); doc.circle(S.m + 1.6, ly - 1.2, 1.6, "F");
+    doc.setFillColor("#2e9e4f"); doc.circle(S.m + 32, ly - 1.2, 1.6, "F");
+    doc.setFontSize(8.5); doc.setTextColor("#444");
+    doc.text("Afdeling", S.m + 4.6, ly);
+    doc.text("Dansk hovedkontor", S.m + 35, ly);
+    if (info.udenKoord > 0) {
+      doc.setTextColor("#8a6d1f");
+      doc.text(info.udenKoord + " uden koordinater vises ikke på kortet", S.m + 78, ly);
+    }
+    doc.setTextColor("#8a8a8a"); doc.setFontSize(7.5);
+    doc.text("Kilde: " + CONFIG.eksport.organisation + "s CRM · Kortdata © OpenStreetMap-bidragydere",
+             S.b - S.m, ly, { align: "right" });
+
+    /* --- Følgende sider: afdelingsliste --- */
+    const tab = hentTabeldata();
+    const bredder = [52, 46, 30, 32, 40, 55, 18];
+    tegnTabel(doc, tab, bredder, info, S, accent);
+
+    /* Sidetal */
+    const sider = doc.getNumberOfPages();
+    for (let i = 1; i <= sider; i++) {
+      doc.setPage(i);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor("#9a9a9a");
+      doc.text("Side " + i + " af " + sider, S.b / 2, S.h - 5, { align: "center" });
+    }
+
+    doc.save(info.filnavn + ".pdf");
+    skjulBesked();
+  } catch (e) { eksportFejl(e); } finally { skjulEksportSkaerm(); }
+}
+
+/* Enkel, sidebrydende tabel — ingen ekstra bibliotek nødvendig. */
+function tegnTabel(doc, tab, bredder, info, S, accent) {
+  const linjeH = 4.2, pad = 1.6;
+  let y = 0;
+
+  const tegnSidehoved = function (nr) {
+    doc.addPage();
+    doc.setFillColor(accent); doc.rect(0, 0, S.b, 14, "F");
+    doc.setTextColor("#ffffff"); doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+    doc.text(info.titel + " – afdelingsliste", S.m, 9);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+    doc.setTextColor("#dbe6f0");
+    doc.text(CONFIG.eksport.organisation + " · " + info.datoTekst, S.b - S.m, 9, { align: "right" });
+    y = 22;
+    tegnHovedraekke();
+  };
+  const tegnHovedraekke = function () {
+    doc.setFillColor("#eef4fb"); doc.rect(S.m, y - 4.6, S.b - S.m * 2, 6.4, "F");
+    doc.setTextColor("#1c3d5c"); doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+    let x = S.m + pad;
+    tab.kolonner.forEach(function (k, i) { doc.text(k, x, y); x += bredder[i]; });
+    doc.setDrawColor("#bcd3ee"); doc.setLineWidth(0.2);
+    doc.line(S.m, y + 1.9, S.b - S.m, y + 1.9);
+    y += 6;
+    doc.setFont("helvetica", "normal"); doc.setTextColor("#222");
+  };
+
+  tegnSidehoved();
+  doc.setFontSize(8);
+
+  tab.raekker.forEach(function (raekke, idx) {
+    const celler = raekke.map(function (v, i) {
+      return doc.splitTextToSize(String(v == null ? "" : v), bredder[i] - pad * 2);
+    });
+    const linjer = celler.reduce(function (m, c) { return Math.max(m, c.length); }, 1);
+    const h = linjer * linjeH + 1.4;
+    if (y + h > S.h - 12) { tegnSidehoved(); doc.setFontSize(8); }
+    if (idx % 2 === 1) { doc.setFillColor("#f7f9fb"); doc.rect(S.m, y - 3.2, S.b - S.m * 2, h, "F"); }
+    let x = S.m + pad;
+    celler.forEach(function (c, i) { doc.text(c, x, y); x += bredder[i]; });
+    y += h;
+  });
+
+  if (tab.afkortet) {
+    doc.setTextColor("#8a6d1f"); doc.setFontSize(8);
+    doc.text("Listen er afkortet til " + CONFIG.eksport.maxTabelRaekker
+      + " rækker. Brug Excel-eksporten for den fulde liste.", S.m, y + 4);
+  }
+}
+
+async function eksporterPptx() {
+  if (!tjekVisning()) return;
+  visEksportSkaerm("Bygger PowerPoint …");
+  try {
+    const info = eksportOverskrift();
+    await indlaesScript(CONFIG.cdn.pptxgen);
+    const kortC = await opsnapKort();
+    const pptx = new window.PptxGenJS();
+    pptx.layout = "LAYOUT_16x9";           /* 10 x 5,625 tommer */
+    pptx.author = CONFIG.eksport.organisation;
+    pptx.title = info.titel;
+    const s = pptx.addSlide();
+
+    s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 10, h: 0.82, fill: { color: CONFIG.eksport.accentfarve.replace("#", "") } });
+    s.addText(info.titel, { x: 0.35, y: 0.08, w: 6.6, h: 0.4, fontSize: 20, bold: true, color: "FFFFFF" });
+    s.addText(info.undertitel, { x: 0.35, y: 0.47, w: 6.6, h: 0.3, fontSize: 10, color: "DBE6F0" });
+    s.addText(CONFIG.eksport.organisation + "\n" + info.datoTekst,
+      { x: 7.1, y: 0.1, w: 2.55, h: 0.6, fontSize: 10, align: "right", color: "FFFFFF" });
+
+    const maxB = 9.3, maxH = 4.1;
+    const forhold = kortC.width / kortC.height;
+    let bB = maxB, bH = maxB / forhold;
+    if (bH > maxH) { bH = maxH; bB = maxH * forhold; }
+    s.addImage({ data: kortC.toDataURL("image/png"), x: (10 - bB) / 2, y: 1.0, w: bB, h: bH });
+
+    const sigY = 1.0 + bH + 0.1;
+    s.addShape(pptx.ShapeType.ellipse, { x: 0.35, y: sigY + 0.05, w: 0.11, h: 0.11, fill: { color: "2A81CB" } });
+    s.addText("Afdeling", { x: 0.5, y: sigY, w: 1.2, h: 0.22, fontSize: 9, color: "444444" });
+    s.addShape(pptx.ShapeType.ellipse, { x: 1.5, y: sigY + 0.05, w: 0.11, h: 0.11, fill: { color: "2E9E4F" } });
+    s.addText("Dansk hovedkontor", { x: 1.65, y: sigY, w: 2, h: 0.22, fontSize: 9, color: "444444" });
+    s.addText("Kilde: " + CONFIG.eksport.organisation + "s CRM · Kortdata © OpenStreetMap-bidragydere",
+      { x: 5.8, y: sigY, w: 3.85, h: 0.22, fontSize: 8, align: "right", color: "888888" });
+
+    /* Slide 2+: afdelingsliste som rigtig PowerPoint-tabel */
+    const tab = hentTabeldata();
+    if (tab.raekker.length) {
+      const s2 = pptx.addSlide();
+      s2.addText(info.titel + " – afdelingsliste",
+        { x: 0.35, y: 0.25, w: 9.3, h: 0.4, fontSize: 16, bold: true, color: CONFIG.eksport.accentfarve.replace("#", "") });
+      const raekker = [tab.kolonner.map(function (k) {
+        return { text: k, options: { bold: true, color: "1C3D5C", fill: { color: "EEF4FB" } } };
+      })].concat(tab.raekker.map(function (r) { return r.map(function (v) { return String(v); }); }));
+      s2.addTable(raekker, {
+        x: 0.35, y: 0.8, w: 9.3, colW: [1.9, 1.55, 1.0, 1.0, 1.3, 1.6, 0.95],
+        fontSize: 8, border: { type: "solid", color: "DDE3EA", pt: 0.5 },
+        autoPage: true, autoPageRepeatHeader: true, autoPageLineWeight: -0.4,
+        newSlideStartY: 0.5
+      });
+    }
+
+    const blob = await pptx.write({ outputType: "blob" });
+    gemBlob(blob, info.filnavn + ".pptx");
+    skjulBesked();
+  } catch (e) { eksportFejl(e); } finally { skjulEksportSkaerm(); }
+}
+
+function eksportFejl(e) {
+  console.error("Eksportfejl:", e);
+  const tekst = String((e && e.message) || e);
+  if (/tainted|SecurityError|insecure/i.test(tekst)) {
+    visBesked("Kortbaggrunden kunne ikke kopieres til billedet (browseren blokerede kortfliserne). "
+      + "Prøv at genindlæse siden og eksportere igen.", true);
+  } else if (/Kunne ikke hente/.test(tekst)) {
+    visBesked("Eksportbiblioteket kunne ikke hentes. Tjek at cdnjs.cloudflare.com ikke er blokeret på netværket.", true);
+  } else {
+    visBesked("Eksporten gik galt: " + tekst + " – tryk F12 og send fejlteksten fra Console i chatten.", true);
+  }
+}
+
+function opsaetEksportknapper() {
+  const luk = function () { const d = $("msEksport"); if (d) d.open = false; };
+  $("eksPng").addEventListener("click", function () { luk(); eksporterPng(); });
+  $("eksPdf").addEventListener("click", function () { luk(); eksporterPdf(); });
+  $("eksPptx").addEventListener("click", function () { luk(); eksporterPptx(); });
+  $("fExcel").addEventListener("click", eksporterExcel);
+  document.addEventListener("click", function (e) {
+    const d = $("msEksport"); if (d && d.open && !d.contains(e.target)) d.open = false;
+  });
+}
+
+/* ===================================================================== */
+
 function eksporterExcel() {
   const liste = synligListe;
   if (!liste || liste.length === 0) { visBesked("Der er ingen afdelinger at eksportere i den aktuelle visning.", true); return; }
@@ -330,12 +887,17 @@ function startMedlemstilstand() {
   else liste = alleRecords.filter(function (r) { const m = F(r, "medlem"); return m && String(m.id) === String(tilstand.kontoId); });
   if (liste.length === 0) {
     visBesked("Der er endnu ikke registreret afdelinger for dette medlem. "
-      + "Tilføj dem via den relaterede liste \u201EAfdelinger\u201C på kontoen.");
+      + "Tilføj dem via den relaterede liste „Afdelinger“ på kontoen.");
     return;
   }
   synligListe = liste;
+  /* Eksportknapperne skal også være der på medlemsvisningen */
+  $("filterbar").hidden = false;
+  $("filterbar").classList.add("kun-eksport");
+  opsaetEksportknapper();
   const res = tegnMarkers(liste);
   const navnetekst = tilstand.brands.length ? tilstand.brands.join(", ") : tilstand.kontoNavn;
+  $("taeller").textContent = res.viste + " lokation(er)";
   opdaterBund(res, "Viser " + res.viste + " lokation(er) for " + navnetekst);
 }
 function opsaetMedlemstypeMultiselect() {
@@ -396,7 +958,7 @@ function startGlobalTilstand() {
   $("fBrand").addEventListener("change", anvendFilter);
   $("fSoeg").addEventListener("input", anvendFilter);
   $("fForael").addEventListener("change", anvendFilter);
-  $("fExcel").addEventListener("click", eksporterExcel);
+  opsaetEksportknapper();
   $("fNulstil").addEventListener("click", function () {
     $("fLand").value = ""; $("fBrand").value = ""; $("fSoeg").value = ""; $("fForael").checked = false;
     Array.prototype.forEach.call(document.querySelectorAll(".mtype"), function (c) { c.checked = true; });
