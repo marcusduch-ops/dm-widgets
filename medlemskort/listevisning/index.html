@@ -134,6 +134,9 @@
   table.imp-tabel tr.advarsel td { background: #fffaf0; }
   table.imp-tabel tr.blokeret td { background: #fdf0f0; color: #6b4040; }
   table.imp-tabel select { font-size: 11.5px; padding: 2px 4px; max-width: 200px; }
+  table.imp-tabel input.imp-celle { font-size: 11.5px; padding: 3px 5px; border: 1px solid #c9d4e0;
+        border-radius: 4px; font-family: inherit; box-sizing: border-box; }
+  table.imp-tabel tr.blokeret input.imp-celle { border-color: #e2b6b6; background: #fff; }
   .imp-maerke { display: inline-block; font-size: 10.5px; padding: 1px 6px; border-radius: 9px;
         border: 1px solid; white-space: nowrap; }
   .m-ny    { background: #eef7f0; border-color: #bfe0c6; color: #1c6b2c; }
@@ -320,6 +323,10 @@ const CONFIG = {
      en widget kan ikke selv oprette pickliste-værdier. */
   afdelingstypeVaerdier: ["Dansk hovedkontor", "Agent", "Licenstager", "Salg & service",
                           "Produktion", "Kontor", "Værft", "Andet"],
+  /* Felter en række skal have udfyldt for at kunne oprettes via masseoprettelsen.
+     Står de som påkrævede i CRM-layoutet, afviser Zoho ellers både oprettelsen og
+     senere opdateringer af posten. Fjern fx "postnr" her hvis I kan undvære det. */
+  importPaakraevet: ["adresse", "postnr", "by", "land"],
   /* Farver til typemærkaterne i tabellen */
   typeFarver: {
     "Dansk hovedkontor": "#2e9e4f", "Agent": "#d2791e", "Licenstager": "#8250b8",
@@ -410,10 +417,28 @@ function visBesked(tekst, type) {
   const b = $("besked"); b.textContent = tekst; b.className = "besked" + (type ? " " + type : ""); b.hidden = false;
 }
 function skjulBesked() { $("besked").hidden = true; }
+/* Graver Zohos egen fejlkode og -tekst ud, så beskeden kan læses uden at åbne Console */
+function zohoFejlTekst(e) {
+  if (!e) return "ukendt fejl";
+  if (typeof e === "string") return e;
+  const d = (e.data && e.data[0]) ? e.data[0] : e;
+  const dele = [];
+  if (d.code) dele.push(d.code);
+  if (d.message && d.message !== d.code) dele.push(d.message);
+  if (d.details && d.details.api_name) dele.push("felt: " + d.details.api_name);
+  if (d.details && d.details.expected_data_type) dele.push("forventet: " + d.details.expected_data_type);
+  if (!dele.length && (e.status || e.statusText)) dele.push("HTTP " + (e.status || e.statusText));
+  if (!dele.length) {
+    try { return JSON.stringify(e).slice(0, 400); } catch (x) { return String(e); }
+  }
+  return dele.join(" – ");
+}
 function visFejl(fejl) {
-  console.error("Afdelinger-widget fejl:", fejl);
-  visBesked("Noget gik galt. Tryk F12 → fanen Console, kopiér den røde fejltekst "
-    + "og send den i chatten – så finder vi fejlen sammen.", "fejl");
+  let json = "";
+  try { json = JSON.stringify(fejl); } catch (e) { json = String(fejl); }
+  console.error("Afdelinger-widget fejl:", zohoFejlTekst(fejl), json, fejl);
+  visBesked("Noget gik galt: " + zohoFejlTekst(fejl)
+    + " — står der ikke nok, så tryk F12 → Console og send linjen „Afdelinger-widget fejl“ i chatten.", "fejl");
 }
 function medlemstypeForAfd(r) {
   const m = F(r, "medlem");
@@ -421,14 +446,37 @@ function medlemstypeForAfd(r) {
   const k = kontoMap[String(m.id)];
   return k ? k.type : null;
 }
+let hentAdvarsel = "";
+/* Zoho udleverer kun de første 2000 rækker gennem page/per_page (fejlen
+   DISCRETE_PAGINATION_LIMIT_EXCEEDED). Tilbyder svaret et next_page_token,
+   bruges det; ellers stopper vi pænt og viser hvad der nåede at komme hjem,
+   så en enkelt fejlende side ikke slår hele widget'en ud. */
 async function hentAlleAfdelinger() {
-  let side = 1, ud = [];
-  while (side <= 25) {
-    const svar = await ZOHO.CRM.API.getAllRecords({ Entity: CONFIG.modul, sort_order: "asc", per_page: 200, page: side });
+  hentAdvarsel = "";
+  let side = 1, ud = [], token = null;
+  while (side <= 100) {
+    const forespoergsel = { Entity: CONFIG.modul, sort_order: "asc", per_page: 200 };
+    if (token) forespoergsel.page_token = token; else forespoergsel.page = side;
+    let svar;
+    try {
+      svar = await ZOHO.CRM.API.getAllRecords(forespoergsel);
+    } catch (e) {
+      console.warn("Hentning af afdelinger stoppede:", e);
+      hentAdvarsel = "Kun " + ud.length + " afdelinger kunne hentes (" + zohoFejlTekst(e)
+        + "). Listen er derfor ikke komplet.";
+      break;
+    }
     const data = (svar && svar.data) ? svar.data : [];
     ud = ud.concat(data);
-    if (data.length < 200) break;
+    const info = (svar && svar.info) || {};
+    if (data.length < 200 || info.more_records === false) break;
+    token = info.next_page_token || null;
     side++;
+    if (!token && side * 200 > 2000) {
+      hentAdvarsel = "Zoho udleverer kun de første 2000 afdelinger til en widget ad gangen, "
+        + "og modulet er vokset forbi det. Listen viser de første " + ud.length + ".";
+      break;
+    }
   }
   return ud;
 }
@@ -605,15 +653,18 @@ function startRedigering(id) { redigererId = id; tegnTabel(); }
 function genbekraeft(id) {
   const r = recordById(id); if (!r) return;
   const idag = idagISO();
-  const data = {}; data[CONFIG.felter.bekraeftet] = idag;
+  /* VIGTIGT: widget-SDK'et vil have record-id'et INDE i APIData – ikke som RecordID.
+     Sendes det som RecordID, svarer Zoho HTTP 400, fordi opdateringen er uden id. */
+  const data = { id: String(id) };
+  data[CONFIG.felter.bekraeftet] = idag;
   skjulBesked();
-  ZOHO.CRM.API.updateRecord({ Entity: CONFIG.modul, RecordID: id, APIData: data, Trigger: [] })
+  ZOHO.CRM.API.updateRecord({ Entity: CONFIG.modul, APIData: data, Trigger: [] })
     .then(function (svar) {
       const res = svar && svar.data && svar.data[0];
       if (res && res.code === "SUCCESS") {
         r[CONFIG.felter.bekraeftet] = idag; tegnTabel();
         visBesked("✔ „" + (F(r, "navn") || "Afdeling") + "“ bekræftet i dag (" + idag + ").", "ok");
-      } else { visBesked("Kunne ikke bekræfte: " + (res && res.message ? res.message : "ukendt fejl."), "fejl"); console.error(svar); }
+      } else { visBesked("Kunne ikke bekræfte: " + zohoFejlTekst(res || svar), "fejl"); console.error(svar); }
     }).catch(function (fejl) { visFejl(fejl); });
 }
 function gemRedigering(id, tr) {
@@ -626,7 +677,7 @@ function gemRedigering(id, tr) {
     type: typeSel ? typeSel.value : ""
   };
   if (!nye.navn) { visBesked("Afdelingsnavn må ikke være tomt.", "fejl"); return; }
-  const data = {};
+  const data = { id: String(id) };     /* id skal med i APIData – se kommentaren i genbekraeft */
   data[CONFIG.felter.navn] = nye.navn; data[CONFIG.felter.brand] = nye.brand;
   data[CONFIG.felter.land] = nye.land; data[CONFIG.felter.by] = nye.by;
   data[CONFIG.felter.adresse] = nye.adresse; data[CONFIG.felter.postnr] = nye.postnr;
@@ -636,7 +687,7 @@ function gemRedigering(id, tr) {
   const landAendret = String(F(r, "land") || "") !== nye.land;
   if (byAendret || landAendret) { data[CONFIG.felter.lat] = null; data[CONFIG.felter.lon] = null; data[CONFIG.felter.geonoegle] = null; }
   const gemKnap = tr.querySelector('[data-akt="gem"]'); gemKnap.disabled = true; skjulBesked();
-  ZOHO.CRM.API.updateRecord({ Entity: CONFIG.modul, RecordID: id, APIData: data, Trigger: ["workflow"] })
+  ZOHO.CRM.API.updateRecord({ Entity: CONFIG.modul, APIData: data, Trigger: ["workflow"] })
     .then(function (svar) {
       const res = svar && svar.data && svar.data[0];
       if (res && res.code === "SUCCESS") {
@@ -647,7 +698,7 @@ function gemRedigering(id, tr) {
         redigererId = null; genopbygFiltre(); tegnTabel();
         visBesked("✔ „" + nye.navn + "“ er gemt og bekræftet i dag."
           + ((byAendret || landAendret) ? " Nye koordinater hentes automatisk om få sekunder." : ""), "ok");
-      } else { gemKnap.disabled = false; visBesked("Kunne ikke gemme: " + (res && res.message ? res.message : "ukendt fejl."), "fejl"); console.error(svar); }
+      } else { gemKnap.disabled = false; visBesked("Kunne ikke gemme: " + zohoFejlTekst(res || svar), "fejl"); console.error(svar); }
     }).catch(function (fejl) { gemKnap.disabled = false; visFejl(fejl); });
 }
 function sletAfdeling(id) {
@@ -663,7 +714,7 @@ function sletAfdeling(id) {
         if (String(redigererId) === String(id)) redigererId = null;
         genopbygFiltre(); tegnTabel();
         visBesked("🗑 „" + navn + "“ er slettet.", "ok");
-      } else { visBesked("Kunne ikke slette: " + (res && res.message ? res.message : "ukendt fejl."), "fejl"); console.error(svar); }
+      } else { visBesked("Kunne ikke slette: " + zohoFejlTekst(res || svar), "fejl"); console.error(svar); }
     }).catch(function (fejl) { visFejl(fejl); });
 }
 function genopbygFiltre() {
@@ -769,7 +820,7 @@ function gemAfdeling() {
       if (r && r.code === "SUCCESS") {
         visBesked("✔ Afdelingen „" + v.navn + "“ er oprettet. Koordinaterne udfyldes automatisk inden for få sekunder.", "ok");
         genindlaesData().then(function () { rydFelter(); skiftFane("oversigt"); });
-      } else { visBesked("Kunne ikke gemme: " + (r && r.message ? r.message : "ukendt fejl."), "fejl"); console.error(svar); }
+      } else { visBesked("Kunne ikke gemme: " + zohoFejlTekst(r || svar), "fejl"); console.error(svar); }
     }).catch(function (fejl) { $("oGem").disabled = false; visFejl(fejl); });
 }
 async function genindlaesData() {
@@ -921,6 +972,8 @@ function opdaterPrompt() {
 "3. Udfyld \"kilde\" med den konkrete URL hvor oplysningen står. Rækker uden kilde bliver kasseret.\n" +
 "4. Lad et felt stå tomt frem for at udfylde det med noget du ikke har belæg for.\n" +
 "5. Én række pr. fysisk lokation. Har en virksomhed flere i landet, så tag dem alle med.\n" +
+"   Tag adresse, postnummer og by med når de fremgår af kilden — men opfind dem aldrig;\n" +
+"   manglende felter udfylder jeg selv bagefter.\n" +
 "6. Skriv \"virksomhed\" PRÆCIS som navnet står i listen nederst — ellers kan rækken ikke kobles\n" +
 "   til den rigtige virksomhed.\n" +
 "7. \"afdelingstype\" skal være én af: " + CONFIG.afdelingstypeVaerdier.join(", ") + ".\n" +
@@ -1045,6 +1098,9 @@ function erDublet(raekke) {
     return false;
   });
 }
+const FELT_ETIKET = { adresse: "adresse", postnr: "postnummer", by: "by", land: "land",
+                      navn: "afdelingsnavn", virksomhed: "virksomhed" };
+function feltEtiket(f) { return FELT_ETIKET[f] || f; }
 function vurderRaekke(r) {
   const konto = r.kontoId
     ? alleKonti.filter(function (k) { return String(k.id) === String(r.kontoId); })[0]
@@ -1053,15 +1109,21 @@ function vurderRaekke(r) {
   r.kontoNavn = konto ? konto.navn : "";
   r.problemer = [];
   if (!r.kontoId) r.problemer.push("ikke et medlem i CRM");
-  if (!r.adresse && !r.by) r.problemer.push("hverken adresse eller by");
+  const mangler = CONFIG.importPaakraevet.filter(function (f) { return !String(r[f] || "").trim(); });
+  if (mangler.length) r.problemer.push("mangler " + mangler.map(feltEtiket).join(", "));
   if (!r.kilde) r.problemer.push("ingen kilde");
   if (erDublet(r)) r.problemer.push("findes måske allerede");
-  r.blokeret = !r.kontoId || (!r.adresse && !r.by);
+  r.blokeret = !r.kontoId || mangler.length > 0;
   const kraevKilde = $("impKunMedKilde") ? $("impKunMedKilde").checked : true;
   r.valgt = !r.blokeret
          && r.problemer.indexOf("findes måske allerede") === -1
          && (!kraevKilde || !!r.kilde);
   return r;
+}
+/* Redigerbar celle i gennemsynstabellen, så manglende felter kan udfyldes på stedet */
+function impFelt(i, felt, vaerdi, bredde) {
+  return '<input class="imp-celle" data-raekke="' + i + '" data-felt="' + felt + '" style="width:'
+       + bredde + 'px" value="' + esc(vaerdi || "") + '">';
 }
 function tegnImportTabel() {
   const tabel = $("impTabel");
@@ -1087,11 +1149,11 @@ function tegnImportTabel() {
       + (r.valgt ? " checked" : "") + (r.blokeret ? " disabled" : "") + "></td>"
       + "<td>" + maerke + "</td>"
       + "<td>" + esc(r.virksomhed || "") + "<br>" + vaelger + "</td>"
-      + "<td>" + esc(r.navn || "") + "</td>"
+      + "<td>" + impFelt(i, "navn", r.navn, 150) + "</td>"
       + "<td>" + typeVaelger + "</td>"
-      + "<td>" + esc(r.adresse || "") + "</td>"
-      + "<td>" + esc(r.postnr || "") + "</td>"
-      + "<td>" + esc(r.by || "") + "</td>"
+      + "<td>" + impFelt(i, "adresse", r.adresse, 150) + "</td>"
+      + "<td>" + impFelt(i, "postnr", r.postnr, 60) + "</td>"
+      + "<td>" + impFelt(i, "by", r.by, 100) + "</td>"
       + "<td>" + (r.kilde ? '<a href="' + esc(r.kilde) + '" target="_blank" rel="noopener">kilde</a>' : "—") + "</td>"
       + "</tr>";
   });
@@ -1112,6 +1174,20 @@ function tegnImportTabel() {
   });
   Array.prototype.forEach.call(tabel.querySelectorAll(".imp-type"), function (sel) {
     sel.addEventListener("change", function () { impRaekker[+sel.dataset.raekke].type = sel.value; });
+  });
+  Array.prototype.forEach.call(tabel.querySelectorAll(".imp-celle"), function (inp) {
+    /* Opdatér værdien løbende, men tegn først tabellen om når feltet forlades,
+       så markøren ikke hopper ud af feltet mens man skriver. */
+    inp.addEventListener("input", function () {
+      impRaekker[+inp.dataset.raekke][inp.dataset.felt] = inp.value;
+    });
+    inp.addEventListener("change", function () {
+      const r = impRaekker[+inp.dataset.raekke];
+      const varValgt = r.valgt;
+      vurderRaekke(r);
+      if (varValgt && !r.blokeret) r.valgt = true;
+      tegnImportTabel();
+    });
   });
   opdaterImportOversigt();
 }
@@ -1271,6 +1347,7 @@ async function vedPageLoad(data) {
       } catch (e) { console.warn("Kunne ikke hente kontonavn:", e); }
     }
     skjulBesked(); opsaetOversigt(); opsaetOpret(); opsaetMasse();
+    if (hentAdvarsel) visBesked("⚠ " + hentAdvarsel);
   } catch (fejl) { visFejl(fejl); }
 }
 document.addEventListener("DOMContentLoaded", function () {
