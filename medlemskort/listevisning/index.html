@@ -145,6 +145,28 @@
   .imp-kvit { font-size: 13px; padding: 10px 12px; border-radius: 6px; background: #e9f7ec;
         border: 1px solid #c3e6cb; color: #1c5b2c; margin-top: 10px; max-width: 1100px; }
   .imp-kvit.fejl { background: #fdecec; border-color: #f2c4c4; color: #8a1f1f; }
+
+  /* ---------- Medlemskab og brands ---------- */
+  .kontonavn { font-size: 11px; color: #7a8794; margin-top: 1px; }
+  .status-badge { display: inline-block; font-size: 10.5px; padding: 1px 6px; border-radius: 9px;
+        background: #fdecec; border: 1px solid #f2c4c4; color: #8a1f1f; white-space: nowrap; margin-top: 2px; }
+  tbody tr.problem td { background: #fff8f8; }
+  .fane-advar { display: inline-block; min-width: 16px; padding: 0 5px; margin-left: 4px; border-radius: 9px;
+        background: #c0392b; color: #fff; font-size: 11px; font-weight: 700; text-align: center; }
+  td select.celle-medlem { width: 100%; min-width: 160px; box-sizing: border-box; padding: 4px 6px;
+        border: 1px solid #9fb6d4; border-radius: 5px; font-size: 12.5px; font-family: inherit; background: #fff; }
+  .medlem-advar { display: none; margin-top: 6px; padding: 8px 10px; border-radius: 6px; font-size: 12.5px;
+        background: #fff7e6; color: #7a4b00; border: 1px solid #f0dcb4; }
+  .medlem-advar.vis { display: block; }
+  table.imp-tabel tr.aendret td { background: #f2f8ff; }
+  table.imp-tabel input.brand-input { width: 190px; font-size: 12px; padding: 4px 6px; border: 1px solid #c9d4e0;
+        border-radius: 4px; font-family: inherit; }
+  .b-note { font-size: 11.5px; color: #555; line-height: 1.5; }
+  .b-note .imp-knap { padding: 1px 7px; font-size: 11px; margin-left: 4px; }
+  .b-gruppe { display: inline-block; font-size: 10.5px; padding: 0 6px; border-radius: 9px;
+        background: #eef4fb; border: 1px solid #bcd3ee; color: #1c3d5c; white-space: nowrap; }
+  .imp-knap.slet { color: #a01a1a; border-color: #e2b6b6; }
+  .imp-knap.slet:hover { background: #fdecec; }
 </style>
 </head>
 <body>
@@ -153,6 +175,7 @@
   <div class="fane aktiv" id="faneOversigt">📋 Oversigt</div>
   <div class="fane" id="faneOpret">➕ Tilføj afdeling</div>
   <div class="fane" id="faneMasse">⚡ Masseoprettelse</div>
+  <div class="fane" id="faneBrands">🏷 Medlemmer &amp; brands<span id="faneBrandsAdvar"></span></div>
 </div>
 
 <div class="besked" id="besked" hidden></div>
@@ -168,6 +191,7 @@
     <select id="fLand"><option value="">Alle lande</option></select>
     <input id="fSoeg" type="text" placeholder="Søg afdeling, by eller adresse …">
     <label id="kunForael"><input type="checkbox" id="fForael"> Kun forældede</label>
+    <label id="kunProblem" style="font-size:12.5px;color:#555;display:flex;align-items:center;gap:5px;"><input type="checkbox" id="fProblem"> Kun uden gyldigt medlem</label>
     <button id="fNulstil" type="button">Nulstil</button>
     <button id="fExcel" type="button" class="knap knap-excel">⬇ Eksportér denne visning til Excel</button>
     <span id="taeller"></span>
@@ -203,7 +227,8 @@
       <div class="felt">
         <label>Medlem (virksomhed) <span class="paakraevet">*</span></label>
         <select id="oMedlem"><option value="">Vælg medlem …</option></select>
-        <div class="hjaelp">Kun aktive medlemmer kan vælges – rene kontakter vises ikke.</div>
+        <div class="hjaelp">Kun virksomheder med en medlemstype kan vælges – rene kontakter vises ikke.</div>
+        <div class="medlem-advar" id="oIkkeMedlem"></div>
         <div class="fejltekst" id="eMedlem" hidden>Vælg et medlem.</div>
       </div>
       <div class="felt">
@@ -299,6 +324,42 @@
   </div>
 </div>
 
+<div id="visBrands" hidden>
+  <div class="imp-krop">
+
+    <div class="imp-trin" id="bProblemTrin" hidden>
+      <h3>Afdelinger uden gyldigt medlem</h3>
+      <p class="under">Disse afdelinger hører til en konto uden medlemstype, eller også er de ikke koblet til
+        nogen konto. De vises ikke på afdelingskortet. Flyt dem til det rigtige medlem, fx hvis virksomheden er
+        skiftet til en anden konto eller er blevet en del af et andet medlem. Eller slet dem, hvis de ikke skal bruges.</p>
+      <div class="imp-tabelboks"><table class="imp-tabel" id="bProblemTabel"></table></div>
+      <div id="bProblemKvit"></div>
+    </div>
+
+    <div class="imp-trin">
+      <h3>Brands</h3>
+      <p class="under">Brandet er det navn, virksomheden står med i listen, på afdelingskortet og i eksporten.
+        Giv flere konti samme brand, så samles de til én virksomhed – fx ALFA LAVAL AALBORG A/S og
+        ALFA LAVAL COPENHAGEN A/S → Alfa Laval. Står feltet tomt, bruges CVR-navnet uden A/S, ApS osv.
+        Brandet gemmes på kontoen, så det følger med, også når navnet ændres i CVR.</p>
+      <div class="imp-raekke">
+        <input type="text" id="bSoeg" placeholder="Søg medlem eller brand …" style="width:220px">
+        <label style="font-size:12.5px;color:#555;display:flex;align-items:center;gap:5px;"><input type="checkbox" id="bAlle"> Vis også medlemmer uden afdelinger</label>
+        <button class="imp-knap" id="bBrugForslag" type="button">Brug alle navne fra kortet</button>
+        <span class="imp-info" id="bInfo"></span>
+      </div>
+      <div class="imp-tabelboks" style="max-height:560px"><table class="imp-tabel" id="bTabel"></table></div>
+      <div class="imp-raekke" style="margin-top:10px">
+        <button class="imp-knap primaer" id="bGem" type="button" disabled>Gem ændringer</button>
+        <button class="imp-knap" id="bFortryd" type="button" disabled>Fortryd</button>
+        <span class="imp-info" id="bGemInfo"></span>
+      </div>
+      <div id="bKvit"></div>
+    </div>
+
+  </div>
+</div>
+
 <div class="bund" id="bund" hidden></div>
 
 <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
@@ -321,21 +382,26 @@ const CONFIG = {
   /* Skal matche picklisten "Afdelingstype" i CRM. Nye værdier skal først oprettes
      under Opsætning → Tilpasning → Moduler → Afdelinger → feltet Afdelingstype;
      en widget kan ikke selv oprette pickliste-værdier. */
-  afdelingstypeVaerdier: ["Dansk hovedkontor", "Agent", "Licenstager", "Salg & service",
+  afdelingstypeVaerdier: ["Dansk hovedkontor", "Underafdeling", "Agent", "Licenstager", "Salg & service",
                           "Produktion", "Kontor", "Værft", "Andet"],
   /* Felter en række skal have udfyldt for at kunne oprettes via masseoprettelsen.
      Står de som påkrævede i CRM-layoutet, afviser Zoho ellers både oprettelsen og
      senere opdateringer af posten. Fjern fx "postnr" her hvis I kan undvære det. */
   importPaakraevet: ["adresse", "postnr", "by", "land"],
   /* Farver til typemærkaterne i tabellen */
-  typeFarver: {
-    "Dansk hovedkontor": "#2e9e4f", "Agent": "#d2791e", "Licenstager": "#8250b8",
+  typeFarver: {     /* samme farver som på afdelingskortet */
+    "Dansk hovedkontor": "#2e9e4f", "Underafdeling": "#1f4e9c", "Agent": "#d2791e", "Licenstager": "#8250b8",
     "Salg & service": "#2a81cb", "Produktion": "#0f8f8f", "Kontor": "#55657a",
     "Værft": "#b5396b", "Andet": "#7a8794"
   },
   konto: {
     navnFelt: "Account_Name",
     medlemstypeFelt: "Medlemstype",
+    /* Tekstfelt på Konti med det navn, virksomheden skal stå med på kortet og i
+       eksporten (fx "Alfa Laval" på både ALFA LAVAL AALBORG A/S og ALFA LAVAL
+       COPENHAGEN A/S). Skal matche API-navnet i CRM – og være det samme i
+       afdelingskortet. Står feltet tomt på en konto, bruges CVR-navnet uden A/S, ApS osv. */
+    brandFelt: "Internationalt_brand",
     /* Alle fire tæller som medlemskab. Konti uden værdi i feltet er ikke medlemmer
        og kommer hverken i medlemsrullelisten eller i masseoprettelsen. */
     alleMedlemstyper: ["DI - Ordinær", "Associeret", "Iværksættermedlem", "Støttemedlem"]
@@ -446,6 +512,56 @@ function medlemstypeForAfd(r) {
   const k = kontoMap[String(m.id)];
   return k ? k.type : null;
 }
+
+/* =====================================================================
+   MEDLEMSKAB OG BRAND
+   En afdeling hører til et medlem via opslagsfeltet Medlem (kontoens id) –
+   aldrig via navnet. Derfor følger afdelingerne med, når et medlem skifter
+   navn i CVR. Navnet der vises (brandet) læses også fra kontoen hver gang:
+   feltet Internationalt brand, ellers CVR-navnet uden selskabsform.
+   Feltet Brand på selve afdelingen er kun en kopi til CRM's egne visninger.
+   ===================================================================== */
+let kontiKomplet = true;     /* false hvis ikke alle konti kunne hentes */
+const SELSKABSFORM_SLUT = /[\s,]+(a\/s|aps|i\/s|p\/s|k\/s|ivs|a\.?m\.?b\.?a\.?|f\.?m\.?b\.?a\.?|s\.?m\.?b\.?a\.?)$/i;
+function rensKontonavn(navn) {
+  let s = String(navn || "").trim(), f;
+  while ((f = s.replace(SELSKABSFORM_SLUT, "").trim()) !== s && f) s = f;
+  return s;
+}
+function brandForKonto(k) {
+  if (!k) return "";
+  const b = String(k.brand || "").trim();
+  return b || rensKontonavn(k.navn);
+}
+function kontoForAfd(r) {
+  const m = F(r, "medlem");
+  if (!m || !m.id) return null;
+  return kontoMap[String(m.id)] || null;
+}
+/* "ok" · "ingen" (ikke koblet) · "ikkemedlem" (konto uden medlemstype) ·
+   "slettet" (kontoen findes ikke) · "ukendt" (ikke alle konti kunne hentes) */
+function afdStatus(r) {
+  const m = F(r, "medlem");
+  if (!m || !m.id) return "ingen";
+  const k = kontoMap[String(m.id)];
+  if (!k) return kontiKomplet ? "slettet" : "ukendt";
+  return erGyldigtMedlem(k.type) ? "ok" : "ikkemedlem";
+}
+const STATUS_TEKST = { ingen: "Ingen konto koblet", ikkemedlem: "Ikke medlem", slettet: "Kontoen findes ikke" };
+function erProblem(r) { const s = afdStatus(r); return s === "ingen" || s === "ikkemedlem" || s === "slettet"; }
+function brandForAfd(r) {
+  const k = kontoForAfd(r);
+  if (k) return brandForKonto(k);
+  const b = F(r, "brand");
+  if (b) return String(b);
+  const m = F(r, "medlem");
+  return (m && m.name) ? rensKontonavn(m.name) : "";
+}
+function kontoById(id) { return id ? (kontoMap[String(id)] || null) : null; }
+function medlemsTekst(k) {
+  const b = brandForKonto(k);
+  return k.navn + (normTekst(b) !== normTekst(rensKontonavn(k.navn)) ? " (" + b + ")" : "");
+}
 let hentAdvarsel = "";
 /* Zoho udleverer kun de første 2000 rækker gennem page/per_page (fejlen
    DISCRETE_PAGINATION_LIMIT_EXCEEDED). Tilbyder svaret et next_page_token,
@@ -481,22 +597,39 @@ async function hentAlleAfdelinger() {
   return ud;
 }
 async function hentAlleKonti() {
-  let side = 1, medlemmer = [], map = {}, ialt = 0;
-  while (side <= 25) {
-    const svar = await ZOHO.CRM.API.getAllRecords({ Entity: "Accounts", sort_order: "asc", per_page: 200, page: side });
+  let side = 1, medlemmer = [], map = {}, ialt = 0, token = null;
+  kontiKomplet = true;
+  while (side <= 100) {
+    const forespoergsel = { Entity: "Accounts", sort_order: "asc", per_page: 200 };
+    if (token) forespoergsel.page_token = token; else forespoergsel.page = side;
+    let svar;
+    try {
+      svar = await ZOHO.CRM.API.getAllRecords(forespoergsel);
+    } catch (e) {
+      if (side === 1) throw e;
+      console.warn("Hentning af konti stoppede:", e);
+      kontiKomplet = false;
+      break;
+    }
     const data = (svar && svar.data) ? svar.data : [];
     data.forEach(function (k) {
       ialt++;
       const navn = k[CONFIG.konto.navnFelt] || "";
       const type = k[CONFIG.konto.medlemstypeFelt] || "";
-      map[String(k.id)] = { navn: navn, type: type };
-      if (erGyldigtMedlem(type)) medlemmer.push({ id: k.id, navn: navn, type: type });
+      const brand = k[CONFIG.konto.brandFelt] || "";
+      const post = { id: String(k.id), navn: navn, type: type, brand: brand };
+      map[String(k.id)] = post;
+      if (erGyldigtMedlem(type)) medlemmer.push(post);
     });
-    if (data.length < 200) break;
+    const info = (svar && svar.info) || {};
+    if (data.length < 200 || info.more_records === false) break;
+    token = info.next_page_token || null;
     side++;
+    if (!token && side * 200 > 2000) { kontiKomplet = false; break; }
   }
   medlemmer.sort(function (a, b) { return a.navn.localeCompare(b.navn, "da"); });
-  console.log("Konti hentet:", ialt, "– heraf valgbare medlemmer:", medlemmer.length);
+  console.log("Konti hentet:", ialt, "– heraf valgbare medlemmer:", medlemmer.length,
+    kontiKomplet ? "" : "(ikke alle konti kunne hentes)");
   return { medlemmer: medlemmer, map: map };
 }
 function recordById(id) { return alleRecords.filter(function (r) { return String(r.id) === String(id); })[0]; }
@@ -521,7 +654,7 @@ function opdaterMsSummary() {
   $("msSummary").textContent = (valgt.length === alle) ? "Medlemstype: alle" : "Medlemstype: " + valgt.length + " valgt";
 }
 function udfyldFiltre() {
-  const virks = Array.from(new Set(alleRecords.map(function (r) { return F(r, "brand"); }).filter(Boolean)))
+  const virks = Array.from(new Set(alleRecords.map(brandForAfd).filter(Boolean)))
     .sort(function (a, b) { return a.localeCompare(b, "da"); });
   const lande = Array.from(new Set(alleRecords.map(function (r) { return F(r, "land"); }).filter(Boolean)))
     .sort(function (a, b) { return a.localeCompare(b, "da"); });
@@ -538,16 +671,19 @@ function filtreretListe() {
   const virk = $("fVirksomhed").value, region = $("fRegion").value, land = $("fLand").value;
   const soeg = $("fSoeg").value.trim().toLowerCase();
   const kunForael = $("fForael").checked;
+  const kunProblem = $("fProblem").checked;
   const mtyper = valgteMedlemstyper();
   const alleValgt = mtyper.length === CONFIG.konto.alleMedlemstyper.length;
   return alleRecords.filter(function (r) {
-    if (virk && F(r, "brand") !== virk) return false;
+    if (virk && brandForAfd(r) !== virk) return false;
+    if (kunProblem && !erProblem(r)) return false;
     if (land && F(r, "land") !== land) return false;
     if (region && regionForLand(F(r, "land")) !== region) return false;
     if (kunForael && !bekraeftStatus(r).foraeldet) return false;
     if (!alleValgt) { const mt = medlemstypeForAfd(r); if (mt && mtyper.indexOf(mt) === -1) return false; }
     if (soeg) {
-      const tekst = [F(r, "navn"), F(r, "by"), F(r, "adresse"), F(r, "brand"), F(r, "land")]
+      const k = kontoForAfd(r);
+      const tekst = [F(r, "navn"), F(r, "by"), F(r, "adresse"), brandForAfd(r), k ? k.navn : "", F(r, "land")]
         .filter(Boolean).join(" ").toLowerCase();
       if (tekst.indexOf(soeg) === -1) return false;
     }
@@ -558,9 +694,10 @@ function tegnTabel() {
   const liste = filtreretListe();
   synligListe = liste;
   const krop = $("tabelKrop"); krop.innerHTML = "";
-  let antalForael = 0;
+  let antalForael = 0, antalProblem = 0;
   liste.forEach(function (r) {
     if (bekraeftStatus(r).foraeldet) antalForael++;
+    if (erProblem(r)) antalProblem++;
     const tr = document.createElement("tr");
     tr.setAttribute("data-id", r.id);
     if (String(r.id) === String(redigererId)) byggRedigerRaekke(tr, r);
@@ -569,8 +706,35 @@ function tegnTabel() {
   });
   $("tomBesked").hidden = liste.length > 0;
   $("taeller").textContent = liste.length + " af " + alleRecords.length + " afdelinger"
-    + (antalForael ? " · " + antalForael + " forældede" : "");
+    + (antalForael ? " · " + antalForael + " forældede" : "")
+    + (antalProblem ? " · " + antalProblem + " uden gyldigt medlem" : "");
+  opdaterFaneAdvarsel();
   return liste;
+}
+function opdaterFaneAdvarsel() {
+  const n = alleRecords.filter(erProblem).length;
+  $("faneBrandsAdvar").innerHTML = n ? '<span class="fane-advar" title="' + n
+    + ' afdelinger uden gyldigt medlem">' + n + "</span>" : "";
+}
+function virksomhedCelleHtml(r) {
+  const k = kontoForAfd(r), brand = brandForAfd(r), st = afdStatus(r);
+  let html = "<td>" + esc(brand || "–");
+  if (k && normTekst(rensKontonavn(k.navn)) !== normTekst(brand)) html += '<div class="kontonavn">' + esc(k.navn) + "</div>";
+  if (STATUS_TEKST[st]) html += '<div><span class="status-badge">' + esc(STATUS_TEKST[st]) + "</span></div>";
+  return html + "</td>";
+}
+function medlemSelectCelle(r) {
+  const k = kontoForAfd(r), st = afdStatus(r);
+  let html = '<td><select class="celle-medlem">';
+  if (st !== "ok") {
+    const navn = k ? k.navn : (F(r, "brand") || "ingen konto");
+    html += '<option value="" selected>⚠ ' + esc(navn) + " – vælg et medlem</option>";
+  }
+  alleKonti.forEach(function (m) {
+    html += '<option value="' + esc(m.id) + '"' + (k && String(k.id) === String(m.id) ? " selected" : "")
+         + ">" + esc(medlemsTekst(m)) + "</option>";
+  });
+  return html + "</select></td>";
 }
 function typeFarve(t) {
   if (!t) return null;
@@ -596,11 +760,11 @@ function bekraeftCelleHtml(r) {
     + '<br><button class="knap-lille knap-bekraeft" data-akt="bekraeft">✓ Genbekræft</button></td>';
 }
 function byggVisRaekke(tr, r) {
-  tr.className = "";
+  tr.className = erProblem(r) ? "problem" : "";
   const mt = medlemstypeForAfd(r);
   tr.innerHTML =
       "<td>" + esc(F(r, "navn")) + "</td>"
-    + "<td>" + esc(F(r, "brand")) + "</td>"
+    + virksomhedCelleHtml(r)
     + '<td><span class="mtype-tekst">' + esc(mt || "–") + "</span></td>"
     + typeCelleHtml(r)
     + "<td>" + esc(regionForLand(F(r, "land"))) + "</td>"
@@ -623,6 +787,10 @@ function byggVisRaekke(tr, r) {
 function inputCelle(vaerdi) { return '<td><input class="celle" value="' + esc(vaerdi) + '"></td>'; }
 function typeSelectCelle(valgt) {
   let html = '<td><select class="celle-type"><option value="">(ingen)</option>';
+  /* En type der ikke står i listen (fx tilføjet i CRM senere) bevares, så den ikke slettes ved Gem */
+  if (valgt && CONFIG.afdelingstypeVaerdier.indexOf(valgt) === -1) {
+    html += '<option value="' + esc(valgt) + '" selected>' + esc(valgt) + "</option>";
+  }
   CONFIG.afdelingstypeVaerdier.forEach(function (t) {
     html += '<option value="' + esc(t) + '"' + (t === valgt ? " selected" : "") + ">" + esc(t) + "</option>";
   });
@@ -634,7 +802,7 @@ function byggRedigerRaekke(tr, r) {
   tr.className = "redigerer";
   tr.innerHTML =
       inputCelle(F(r, "navn"))
-    + inputCelle(F(r, "brand"))
+    + medlemSelectCelle(r)
     + '<td><span class="mtype-tekst">' + esc(mt || "–") + "</span></td>"
     + typeSelectCelle(F(r, "afdelingstype"))
     + "<td>" + esc(regionForLand(F(r, "land"))) + "</td>"
@@ -671,14 +839,21 @@ function gemRedigering(id, tr) {
   const r = recordById(id); if (!r) return;
   const inputs = tr.querySelectorAll("input.celle");
   const typeSel = tr.querySelector("select.celle-type");
+  const medlemSel = tr.querySelector("select.celle-medlem");
+  const gammelKonto = kontoForAfd(r);
+  const nyKonto = medlemSel && medlemSel.value ? kontoById(medlemSel.value) : null;
+  const medlemAendret = !!nyKonto && (!gammelKonto || String(gammelKonto.id) !== String(nyKonto.id));
   const nye = {
-    navn: inputs[0].value.trim(), brand: inputs[1].value.trim(), land: inputs[2].value.trim(),
-    by: inputs[3].value.trim(), adresse: inputs[4].value.trim(), postnr: inputs[5].value.trim(),
+    navn: inputs[0].value.trim(), land: inputs[1].value.trim(),
+    by: inputs[2].value.trim(), adresse: inputs[3].value.trim(), postnr: inputs[4].value.trim(),
     type: typeSel ? typeSel.value : ""
   };
   if (!nye.navn) { visBesked("Afdelingsnavn må ikke være tomt.", "fejl"); return; }
+  /* Brandet følger kontoen. Har afdelingen ingen gyldig konto, røres feltet ikke. */
+  nye.brand = nyKonto ? brandForKonto(nyKonto) : (gammelKonto ? brandForKonto(gammelKonto) : (F(r, "brand") || ""));
   const data = { id: String(id) };     /* id skal med i APIData – se kommentaren i genbekraeft */
   data[CONFIG.felter.navn] = nye.navn; data[CONFIG.felter.brand] = nye.brand;
+  if (medlemAendret) data[CONFIG.felter.medlem] = { id: String(nyKonto.id) };
   data[CONFIG.felter.land] = nye.land; data[CONFIG.felter.by] = nye.by;
   data[CONFIG.felter.adresse] = nye.adresse; data[CONFIG.felter.postnr] = nye.postnr;
   data[CONFIG.felter.afdelingstype] = nye.type;
@@ -694,9 +869,11 @@ function gemRedigering(id, tr) {
         r[CONFIG.felter.navn] = nye.navn; r[CONFIG.felter.brand] = nye.brand; r[CONFIG.felter.land] = nye.land;
         r[CONFIG.felter.by] = nye.by; r[CONFIG.felter.adresse] = nye.adresse; r[CONFIG.felter.postnr] = nye.postnr;
         r[CONFIG.felter.afdelingstype] = nye.type; r[CONFIG.felter.bekraeftet] = idag;
+        if (medlemAendret) r[CONFIG.felter.medlem] = { id: String(nyKonto.id), name: nyKonto.navn };
         if (byAendret || landAendret) { r[CONFIG.felter.lat] = null; r[CONFIG.felter.lon] = null; }
-        redigererId = null; genopbygFiltre(); tegnTabel();
+        redigererId = null; genopbygFiltre(); tegnTabel(); tegnBrands();
         visBesked("✔ „" + nye.navn + "“ er gemt og bekræftet i dag."
+          + (medlemAendret ? " Den hører nu til " + nyKonto.navn + "." : "")
           + ((byAendret || landAendret) ? " Nye koordinater hentes automatisk om få sekunder." : ""), "ok");
       } else { gemKnap.disabled = false; visBesked("Kunne ikke gemme: " + zohoFejlTekst(res || svar), "fejl"); console.error(svar); }
     }).catch(function (fejl) { gemKnap.disabled = false; visFejl(fejl); });
@@ -712,7 +889,7 @@ function sletAfdeling(id) {
       if (res && res.code === "SUCCESS") {
         alleRecords = alleRecords.filter(function (x) { return String(x.id) !== String(id); });
         if (String(redigererId) === String(id)) redigererId = null;
-        genopbygFiltre(); tegnTabel();
+        genopbygFiltre(); tegnTabel(); tegnBrands();
         visBesked("🗑 „" + navn + "“ er slettet.", "ok");
       } else { visBesked("Kunne ikke slette: " + zohoFejlTekst(res || svar), "fejl"); console.error(svar); }
     }).catch(function (fejl) { visFejl(fejl); });
@@ -728,19 +905,21 @@ function genopbygFiltre() {
 function eksporterExcel() {
   const liste = synligListe;
   if (!liste || liste.length === 0) { visBesked("Der er ingen rækker at eksportere med de valgte filtre.", "fejl"); return; }
-  const kol = ["Afdeling","Virksomhed","Medlemstype","Afdelingstype","Region","Land","By","Postnummer",
+  const kol = ["Afdeling","Virksomhed (brand)","Konto (CVR-navn)","Medlemstype","Status","Afdelingstype","Region","Land","By","Postnummer",
                "Adresse","Website","Sidst bekræftet","Latitude","Longitude"];
   const rows = [kol];
   liste.forEach(function (r) {
+    const k = kontoForAfd(r);
     rows.push([
-      F(r, "navn") || "", F(r, "brand") || "", medlemstypeForAfd(r) || "", F(r, "afdelingstype") || "",
+      F(r, "navn") || "", brandForAfd(r) || "", k ? k.navn : "", medlemstypeForAfd(r) || "",
+      STATUS_TEKST[afdStatus(r)] || "OK", F(r, "afdelingstype") || "",
       regionForLand(F(r, "land")), F(r, "land") || "", F(r, "by") || "", F(r, "postnr") || "",
       F(r, "adresse") || "", F(r, "website") || "",
       bekraeftStatus(r).harDato ? bekraeftStatus(r).tekst : "", F(r, "lat") || "", F(r, "lon") || ""
     ]);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws["!cols"] = kol.map(function (h, i) { return { wch: (i === 8 ? 34 : (i <= 1 ? 26 : 14)) }; });
+  ws["!cols"] = kol.map(function (h, i) { return { wch: (i === 10 ? 34 : (i <= 2 ? 26 : 14)) }; });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Afdelinger");
   XLSX.writeFile(wb, "afdelinger_" + idagISO() + ".xlsx");
@@ -751,31 +930,40 @@ function opsaetOversigt() {
   ["fVirksomhed", "fRegion", "fLand"].forEach(function (id) { $(id).addEventListener("change", tegnTabel); });
   $("fSoeg").addEventListener("input", tegnTabel);
   $("fForael").addEventListener("change", tegnTabel);
+  $("fProblem").addEventListener("change", tegnTabel);
   $("fExcel").addEventListener("click", eksporterExcel);
   $("fNulstil").addEventListener("click", function () {
     $("fVirksomhed").value = ""; $("fRegion").value = ""; $("fLand").value = "";
-    $("fSoeg").value = ""; $("fForael").checked = false;
+    $("fSoeg").value = ""; $("fForael").checked = false; $("fProblem").checked = false;
     Array.prototype.forEach.call(document.querySelectorAll(".mtype"), function (c) { c.checked = true; });
     opdaterMsSummary(); tegnTabel();
   });
-  if (ctx.entity === "Accounts" && ctx.kontoNavn) {
-    const options = $("fVirksomhed").options;
-    for (let i = 0; i < options.length; i++) {
-      if (options[i].value.length >= 3 && ctx.kontoNavn.toLowerCase().indexOf(options[i].value.toLowerCase()) !== -1) {
-        $("fVirksomhed").value = options[i].value; break;
-      }
-    }
+  /* På en medlemsside vises medlemmets brand – også søsterkonti med samme brand */
+  if (ctx.entity === "Accounts" && ctx.kontoId) {
+    const k = kontoById(ctx.kontoId);
+    const b = k ? brandForKonto(k) : "";
+    if (b && [].some.call($("fVirksomhed").options, function (o) { return o.value === b; })) $("fVirksomhed").value = b;
   }
   tegnTabel();
 }
 function opsaetOpret() {
   const sel = $("oMedlem"); while (sel.options.length > 1) sel.remove(1);
-  alleKonti.forEach(function (k) { const o = document.createElement("option"); o.value = k.id; o.textContent = k.navn; sel.appendChild(o); });
+  alleKonti.forEach(function (k) { const o = document.createElement("option"); o.value = k.id; o.textContent = medlemsTekst(k); sel.appendChild(o); });
   if (alleKonti.length === 0) {
     visBesked("Der blev ikke fundet nogen medlemmer. Tjek at API-navnet for medlemstype "
       + "(„" + CONFIG.konto.medlemstypeFelt + "“) er korrekt i CONFIG.", "fejl");
   }
-  if (ctx.entity === "Accounts" && ctx.kontoId && alleKonti.some(function (k) { return String(k.id) === String(ctx.kontoId); })) sel.value = ctx.kontoId;
+  if (ctx.entity === "Accounts" && ctx.kontoId) {
+    if (alleKonti.some(function (k) { return String(k.id) === String(ctx.kontoId); })) sel.value = ctx.kontoId;
+    else {
+      const k = kontoById(ctx.kontoId);
+      const advar = $("oIkkeMedlem");
+      advar.textContent = "„" + ((k && k.navn) || ctx.kontoNavn || "Denne virksomhed")
+        + "“ har ingen medlemstype, så der kan ikke oprettes afdelinger på den. "
+        + "Hører afdelingen til et medlem, så vælg medlemmet i listen.";
+      advar.classList.add("vis");
+    }
+  }
   const typeSel = $("oType"); while (typeSel.options.length > 1) typeSel.remove(1);
   CONFIG.afdelingstypeVaerdier.forEach(function (t) { const o = document.createElement("option"); o.value = t; o.textContent = t; typeSel.appendChild(o); });
   const dl = $("landeliste");
@@ -807,7 +995,8 @@ function gemAfdeling() {
   const konto = alleKonti.filter(function (k) { return String(k.id) === String(v.medlem); })[0];
   if (!konto) { $("eMedlem").hidden = false; visBesked("Vælg et gyldigt medlem fra listen.", "fejl"); return; }
   const data = {};
-  data[CONFIG.felter.navn] = v.navn; data[CONFIG.felter.medlem] = { id: v.medlem }; data[CONFIG.felter.brand] = konto.navn;
+  data[CONFIG.felter.navn] = v.navn; data[CONFIG.felter.medlem] = { id: String(konto.id) };
+  data[CONFIG.felter.brand] = brandForKonto(konto);
   data[CONFIG.felter.adresse] = v.adresse; data[CONFIG.felter.postnr] = v.postnr;
   data[CONFIG.felter.by] = v.by; data[CONFIG.felter.land] = v.land; data[CONFIG.felter.bekraeftet] = idagISO();
   if (v.type) data[CONFIG.felter.afdelingstype] = v.type;
@@ -824,7 +1013,7 @@ function gemAfdeling() {
     }).catch(function (fejl) { $("oGem").disabled = false; visFejl(fejl); });
 }
 async function genindlaesData() {
-  try { alleRecords = await hentAlleAfdelinger(); genopbygFiltre(); tegnTabel(); }
+  try { alleRecords = await hentAlleAfdelinger(); genopbygFiltre(); tegnTabel(); tegnBrands(); }
   catch (e) { console.warn("Kunne ikke genindlæse:", e); }
 }
 
@@ -855,6 +1044,15 @@ function byggKontoIndeks() {
   });
 }
 const SELSKABSFORM = /(as|aps|ivs|ks|ps|ltd|limited|gmbh|mbh|bv|nv|ab|oy|oyj|inc|llc|sa|spa|srl|plc|group|holding|danmark|denmark)$/;
+/* Svaret kan bruge brandet ("Alfa Laval") i stedet for CVR-navnet. Deler flere
+   medlemmer brand, vælges det af dem, der er valgt i trin 1 – ellers ingen,
+   så man selv vælger konto i gennemsynet. */
+function findKontoEfterBrand(n) {
+  const kandidater = alleKonti.filter(function (k) { return normTekst(brandForKonto(k)) === n; });
+  if (kandidater.length === 1) return kandidater[0];
+  const valgte = kandidater.filter(function (k) { return impValgte[k.id]; });
+  return valgte.length === 1 ? valgte[0] : null;
+}
 function findKonto(navn) {
   if (!kontoIndeks) byggKontoIndeks();
   const n = normTekst(navn);
@@ -862,6 +1060,8 @@ function findKonto(navn) {
   if (kontoIndeks[n]) return kontoIndeks[n];
   const kort = n.replace(SELSKABSFORM, "");
   if (kort.length >= 4 && kontoIndeks[kort]) return kontoIndeks[kort];
+  const viaBrand = findKontoEfterBrand(n) || (kort.length >= 3 ? findKontoEfterBrand(kort) : null);
+  if (viaBrand) return viaBrand;
   let bedst = null;
   Object.keys(kontoIndeks).forEach(function (k) {
     if (k.length < 5) return;
@@ -876,6 +1076,7 @@ const TYPE_ALIAS = {
   agent: "Agent", agenter: "Agent", agentur: "Agent", agency: "Agent", distributor: "Agent",
   licenstager: "Licenstager", licenstagere: "Licenstager", licensee: "Licenstager", licenshaver: "Licenstager",
   hovedkontor: "Dansk hovedkontor", headquarters: "Dansk hovedkontor", hq: "Dansk hovedkontor",
+  underafdeling: "Underafdeling", datterselskab: "Underafdeling", subsidiary: "Underafdeling",
   salgskontor: "Salg & service", sales: "Salg & service", salesoffice: "Salg & service",
   service: "Salg & service", salgogservice: "Salg & service",
   produktion: "Produktion", fabrik: "Produktion", factory: "Produktion", manufacturing: "Produktion",
@@ -939,7 +1140,7 @@ function tegnMedlemsliste() {
     const sp = document.createElement("span");
     sp.textContent = k.type || "";
     l.appendChild(cb);
-    l.appendChild(document.createTextNode(k.navn + " "));
+    l.appendChild(document.createTextNode(medlemsTekst(k) + " "));
     l.appendChild(sp);
     boks.appendChild(l);
   });
@@ -949,7 +1150,10 @@ function valgteMedlemsnavne() {
   return Object.keys(impValgte)
     .map(function (id) {
       const k = alleKonti.filter(function (x) { return String(x.id) === String(id); })[0];
-      return k ? k.navn : null;
+      if (!k) return null;
+      const b = brandForKonto(k);
+      return normTekst(b) !== normTekst(rensKontonavn(k.navn))
+        ? k.navn + " (kendt internationalt som " + b + ")" : k.navn;
     })
     .filter(Boolean)
     .sort(function (a, b) { return a.localeCompare(b, "da"); });
@@ -974,8 +1178,9 @@ function opdaterPrompt() {
 "5. Én række pr. fysisk lokation. Har en virksomhed flere i landet, så tag dem alle med.\n" +
 "   Tag adresse, postnummer og by med når de fremgår af kilden — men opfind dem aldrig;\n" +
 "   manglende felter udfylder jeg selv bagefter.\n" +
-"6. Skriv \"virksomhed\" PRÆCIS som navnet står i listen nederst — ellers kan rækken ikke kobles\n" +
-"   til den rigtige virksomhed.\n" +
+"6. Skriv \"virksomhed\" PRÆCIS som navnet står i listen nederst (uden parentesen) — ellers kan\n" +
+"   rækken ikke kobles til den rigtige virksomhed. Står der \"kendt internationalt som …\" i en\n" +
+"   parentes, så brug det navn, når du søger efter lokationerne.\n" +
 "7. \"afdelingstype\" skal være én af: " + CONFIG.afdelingstypeVaerdier.join(", ") + ".\n" +
 "   Er du i tvivl, så lad feltet stå tomt.\n" +
 "\n" +
@@ -1090,8 +1295,9 @@ function erDublet(raekke) {
     if (land && normTekst(F(eks, "land")) !== land) return false;
     const m = F(eks, "medlem");
     const sammeFirma = raekke.kontoId
-      ? (m && String(m.id) === String(raekke.kontoId))
-      : (normTekst(F(eks, "brand")) === normTekst(raekke.virksomhed));
+      ? ((m && String(m.id) === String(raekke.kontoId))
+         || (!!raekke.brand && normTekst(brandForAfd(eks)) === normTekst(raekke.brand)))
+      : (normTekst(brandForAfd(eks)) === normTekst(raekke.virksomhed));
     if (!sammeFirma) return false;
     if (adr && normTekst(F(eks, "adresse")) === adr) return true;
     if (by && normTekst(F(eks, "by")) === by) return true;
@@ -1104,9 +1310,10 @@ function feltEtiket(f) { return FELT_ETIKET[f] || f; }
 function vurderRaekke(r) {
   const konto = r.kontoId
     ? alleKonti.filter(function (k) { return String(k.id) === String(r.kontoId); })[0]
-    : findKonto(r.virksomhed);
+    : findKonto(String(r.virksomhed || "").replace(/\s*\(kendt internationalt som[^)]*\)\s*$/i, ""));
   r.kontoId = konto ? konto.id : null;
   r.kontoNavn = konto ? konto.navn : "";
+  r.brand = konto ? brandForKonto(konto) : "";
   r.problemer = [];
   if (!r.kontoId) r.problemer.push("ikke et medlem i CRM");
   const mangler = CONFIG.importPaakraevet.filter(function (f) { return !String(r[f] || "").trim(); });
@@ -1138,7 +1345,7 @@ function tegnImportTabel() {
     const vaelger = '<select data-raekke="' + i + '" class="imp-konto"><option value="">— vælg medlem —</option>'
       + alleKonti.map(function (k) {
           return '<option value="' + esc(k.id) + '"' + (String(k.id) === String(r.kontoId) ? " selected" : "")
-               + ">" + esc(k.navn) + "</option>";
+               + ">" + esc(medlemsTekst(k)) + "</option>";
         }).join("") + "</select>";
     const typeVaelger = '<select data-raekke="' + i + '" class="imp-type"><option value="">(ingen)</option>'
       + CONFIG.afdelingstypeVaerdier.map(function (t) {
@@ -1207,8 +1414,8 @@ function opdaterImportOversigt() {
 function raekkeTilCrm(r) {
   const d = {};
   d[CONFIG.felter.navn]    = r.navn || ((r.kontoNavn || r.virksomhed) + (r.by ? " " + r.by : ""));
-  d[CONFIG.felter.medlem]  = { id: r.kontoId };
-  d[CONFIG.felter.brand]   = r.kontoNavn || r.virksomhed || "";
+  d[CONFIG.felter.medlem]  = { id: String(r.kontoId) };
+  d[CONFIG.felter.brand]   = r.brand || brandForKonto(kontoById(r.kontoId)) || r.kontoNavn || "";
   d[CONFIG.felter.land]    = r.land || "";
   d[CONFIG.felter.adresse] = r.adresse || "";
   d[CONFIG.felter.postnr]  = r.postnr || "";
@@ -1322,13 +1529,363 @@ function opsaetMasse() {
   $("impOpret").addEventListener("click", opretValgte);
 }
 
+/* =====================================================================
+   MEDLEMMER & BRANDS
+   1) Afdelinger uden gyldigt medlem: flyt til et medlem eller slet.
+   2) Brands: sæt det navn, et medlem vises med. Gemmes i kontofeltet
+      CONFIG.konto.brandFelt, og afdelingernes kopi i feltet Brand rettes med.
+   ===================================================================== */
+const brandUdkast = {};          /* kontoId -> brand under redigering */
+let brandsKlar = false;
+
+function antalAfdPrKonto() {
+  const n = {};
+  alleRecords.forEach(function (r) { const m = F(r, "medlem"); if (m && m.id) n[String(m.id)] = (n[String(m.id)] || 0) + 1; });
+  return n;
+}
+/* Navnet afdelingerne har stået med indtil nu (feltet Brand), hvis det adskiller
+   sig fra CVR-navnet – fx "Everllence", som er sat i hånden. */
+function tidligereNavn(k) {
+  const taelling = {};
+  alleRecords.forEach(function (r) {
+    const m = F(r, "medlem");
+    if (!m || String(m.id) !== String(k.id)) return;
+    const b = String(F(r, "brand") || "").trim();
+    if (b) taelling[b] = (taelling[b] || 0) + 1;
+  });
+  const navne = Object.keys(taelling).sort(function (a, b) { return taelling[b] - taelling[a]; });
+  const ignorer = [normTekst(k.navn), normTekst(rensKontonavn(k.navn)), normTekst(effektivtBrand(k))];
+  const fundet = navne.filter(function (b) { return ignorer.indexOf(normTekst(b)) === -1 && ignorer.indexOf(normTekst(rensKontonavn(b))) === -1; })[0];
+  return fundet || "";
+}
+function effektivtBrand(k) {
+  if (Object.prototype.hasOwnProperty.call(brandUdkast, k.id)) {
+    const u = String(brandUdkast[k.id]).trim();
+    return u || rensKontonavn(k.navn);
+  }
+  return brandForKonto(k);
+}
+function erAendret(k) {
+  return Object.prototype.hasOwnProperty.call(brandUdkast, k.id)
+    && String(brandUdkast[k.id]).trim() !== String(k.brand || "").trim();
+}
+const STOPORD = ["danish", "dansk", "danske", "nordic", "nordisk", "scandinavian", "marine", "maritime",
+  "international", "european", "global", "the", "det", "den", "shipping", "service", "services", "group", "holding"];
+function foersteOrd(navn) {
+  const ord = rensKontonavn(navn).toLowerCase().split(/[\s\-&.,]+/).filter(Boolean);
+  const o = ord[0] ? normTekst(ord[0]) : "";
+  return (o.length >= 3 && STOPORD.indexOf(o) === -1) ? o : "";
+}
+
+/* ---------- Afdelinger uden gyldigt medlem ---------- */
+function problemGrupper() {
+  const g = {};
+  alleRecords.forEach(function (r) {
+    if (!erProblem(r)) return;
+    const st = afdStatus(r), m = F(r, "medlem");
+    const noegle = (m && m.id) ? "k" + m.id : "t" + normTekst(F(r, "brand") || F(r, "navn"));
+    if (!g[noegle]) {
+      const k = kontoForAfd(r);
+      g[noegle] = { noegle: noegle, status: st, konto: k,
+        navn: k ? k.navn : ((m && m.name) || F(r, "brand") || F(r, "navn") || "(uden navn)"),
+        poster: [], lande: {} };
+    }
+    g[noegle].poster.push(r);
+    const land = F(r, "land"); if (land) g[noegle].lande[land] = true;
+  });
+  return Object.keys(g).map(function (k) { return g[k]; })
+    .sort(function (a, b) { return b.poster.length - a.poster.length || a.navn.localeCompare(b.navn, "da"); });
+}
+/* Gæt på det medlem, gruppen hører til: samme brand, ellers samme første ord */
+function gaetMedlem(gr) {
+  const tekster = [gr.navn].concat(gr.poster.map(function (r) { return F(r, "brand") || ""; })).filter(Boolean);
+  for (let i = 0; i < tekster.length; i++) {
+    const n = normTekst(rensKontonavn(tekster[i]));
+    const sammeBrand = alleKonti.filter(function (k) { return normTekst(brandForKonto(k)) === n; });
+    if (sammeBrand.length === 1) return sammeBrand[0];
+  }
+  const o = foersteOrd(gr.navn);
+  if (!o) return null;
+  const kand = alleKonti.filter(function (k) { return foersteOrd(k.navn) === o || foersteOrd(brandForKonto(k)) === o; });
+  const brands = Array.from(new Set(kand.map(function (k) { return normTekst(brandForKonto(k)); })));
+  if (brands.length !== 1) return null;
+  /* Flere søsterkonti med samme brand: tag den med flest afdelinger */
+  const n = antalAfdPrKonto();
+  return kand.sort(function (a, b) { return (n[b.id] || 0) - (n[a.id] || 0); })[0];
+}
+function tegnProblemer() {
+  const grupper = problemGrupper();
+  $("bProblemTrin").hidden = grupper.length === 0;
+  if (!grupper.length) return;
+  let html = "<thead><tr><th>Konto / navn</th><th>Årsag</th><th>Afdelinger</th><th>Lande</th><th>Flyt til medlem</th><th></th></tr></thead><tbody>";
+  grupper.forEach(function (gr, i) {
+    const gaet = gaetMedlem(gr);
+    const lande = Object.keys(gr.lande).sort(function (a, b) { return a.localeCompare(b, "da"); });
+    const valg = '<select class="b-flyt-til" data-gruppe="' + i + '"><option value="">— vælg medlem —</option>'
+      + alleKonti.map(function (k) {
+          return '<option value="' + esc(k.id) + '"' + (gaet && String(gaet.id) === String(k.id) ? " selected" : "")
+               + ">" + esc(medlemsTekst(k)) + "</option>";
+        }).join("") + "</select>";
+    html += "<tr class='blokeret'>"
+      + "<td><strong>" + esc(gr.navn) + "</strong>" + (gr.konto
+          ? ' <button class="imp-knap b-aabn" type="button" data-id="' + esc(gr.konto.id) + '" style="padding:1px 7px;font-size:11px">CRM ↗</button>' : "")
+      + "</td>"
+      + "<td>" + esc(STATUS_TEKST[gr.status] || gr.status) + "</td>"
+      + "<td>" + gr.poster.length + "</td>"
+      + "<td>" + esc(lande.slice(0, 4).join(", ") + (lande.length > 4 ? " + " + (lande.length - 4) + " flere" : "")) + "</td>"
+      + "<td>" + valg + ' <button class="imp-knap b-flyt" type="button" data-gruppe="' + i + '">Flyt</button></td>'
+      + '<td><button class="imp-knap slet b-slet" type="button" data-gruppe="' + i + '">Slet ' + gr.poster.length + "</button></td>"
+      + "</tr>";
+  });
+  const tabel = $("bProblemTabel");
+  tabel.innerHTML = html + "</tbody>";
+  Array.prototype.forEach.call(tabel.querySelectorAll(".b-flyt"), function (b) {
+    b.addEventListener("click", function () {
+      const gr = grupper[+b.dataset.gruppe];
+      const sel = tabel.querySelector('.b-flyt-til[data-gruppe="' + b.dataset.gruppe + '"]');
+      const maal = kontoById(sel.value);
+      if (!maal) { visKvit("bProblemKvit", "Vælg først det medlem, afdelingerne skal flyttes til.", true); return; }
+      flytAfdelinger(gr, maal);
+    });
+  });
+  Array.prototype.forEach.call(tabel.querySelectorAll(".b-slet"), function (b) {
+    b.addEventListener("click", function () { sletGruppe(grupper[+b.dataset.gruppe]); });
+  });
+  Array.prototype.forEach.call(tabel.querySelectorAll(".b-aabn"), function (b) {
+    b.addEventListener("click", function () {
+      try { ZOHO.CRM.UI.Record.open({ Entity: "Accounts", RecordID: b.dataset.id }); } catch (e) { console.error(e); }
+    });
+  });
+}
+function visKvit(id, tekst, erFejl) {
+  const k = $(id);
+  k.className = "imp-kvit" + (erFejl ? " fejl" : "");
+  k.textContent = tekst;
+}
+/* Opdaterer poster i portioner af 100 og returnerer id'erne der lykkedes */
+async function opdaterPoster(modul, liste) {
+  const ok = [], fejl = [];
+  for (let i = 0; i < liste.length; i += 100) {
+    const portion = liste.slice(i, i + 100);
+    const svar = await ZOHO.CRM.API.updateRecord({ Entity: modul, APIData: portion, Trigger: [] });
+    const data = (svar && svar.data) ? svar.data : [];
+    portion.forEach(function (p, k) {
+      const d = data[k];
+      if (d && (d.code === "SUCCESS" || d.status === "success")) ok.push(String(p.id));
+      else fejl.push(zohoFejlTekst(d || svar));
+    });
+  }
+  return { ok: ok, fejl: fejl };
+}
+async function flytAfdelinger(gr, maal) {
+  const brand = brandForKonto(maal);
+  if (!window.confirm("Flyt " + gr.poster.length + " afdeling(er) fra „" + gr.navn + "“ til „" + maal.navn + "“?")) return;
+  visKvit("bProblemKvit", "Flytter …");
+  try {
+    const liste = gr.poster.map(function (r) {
+      const d = { id: String(r.id) };
+      d[CONFIG.felter.medlem] = { id: String(maal.id) };
+      d[CONFIG.felter.brand] = brand;
+      return d;
+    });
+    const res = await opdaterPoster(CONFIG.modul, liste);
+    alleRecords.forEach(function (r) {
+      if (res.ok.indexOf(String(r.id)) === -1) return;
+      r[CONFIG.felter.medlem] = { id: String(maal.id), name: maal.navn };
+      r[CONFIG.felter.brand] = brand;
+    });
+    visKvit("bProblemKvit", res.ok.length + " afdeling(er) hører nu til " + maal.navn + "."
+      + (res.fejl.length ? " " + res.fejl.length + " blev afvist: " + res.fejl.slice(0, 3).join("; ") : ""), res.fejl.length > 0);
+  } catch (e) {
+    console.error("Flytning fejlede:", e);
+    visKvit("bProblemKvit", "Flytningen fejlede: " + zohoFejlTekst(e), true);
+  }
+  genopbygFiltre(); tegnTabel(); tegnBrands();
+}
+async function sletGruppe(gr) {
+  if (!window.confirm("Slet " + gr.poster.length + " afdeling(er) fra „" + gr.navn
+      + "“ permanent? Dette kan ikke fortrydes.")) return;
+  visKvit("bProblemKvit", "Sletter …");
+  let ok = 0; const fejl = [];
+  for (let i = 0; i < gr.poster.length; i++) {
+    const r = gr.poster[i];
+    try {
+      const svar = await ZOHO.CRM.API.deleteRecord({ Entity: CONFIG.modul, RecordID: r.id });
+      const d = svar && svar.data && svar.data[0];
+      if (d && d.code === "SUCCESS") {
+        ok++;
+        alleRecords = alleRecords.filter(function (x) { return String(x.id) !== String(r.id); });
+      } else fejl.push(zohoFejlTekst(d || svar));
+    } catch (e) { fejl.push(zohoFejlTekst(e)); }
+  }
+  visKvit("bProblemKvit", ok + " afdeling(er) slettet."
+    + (fejl.length ? " " + fejl.length + " kunne ikke slettes: " + fejl.slice(0, 3).join("; ") : ""), fejl.length > 0);
+  genopbygFiltre(); tegnTabel(); tegnBrands();
+}
+
+/* ---------- Brands ---------- */
+function tegnBrands() {
+  if (!brandsKlar) return;
+  tegnProblemer();
+  const antal = antalAfdPrKonto();
+  const soeg = normTekst($("bSoeg").value);
+  const visAlle = $("bAlle").checked;
+  const konti = alleKonti.filter(function (k) {
+    if (!visAlle && !antal[k.id] && !erAendret(k)) return false;
+    if (soeg && normTekst(k.navn + " " + effektivtBrand(k)).indexOf(soeg) === -1) return false;
+    return true;
+  });
+  /* Grupper: konti der deler brand */
+  const gruppe = {};
+  alleKonti.forEach(function (k) {
+    const b = normTekst(effektivtBrand(k));
+    (gruppe[b] = gruppe[b] || []).push(k);
+  });
+  konti.sort(function (a, b) {
+    return normTekst(effektivtBrand(a)).localeCompare(normTekst(effektivtBrand(b))) || a.navn.localeCompare(b.navn, "da");
+  });
+  let html = "<thead><tr><th>Konto (CVR-navn)</th><th>Medlemstype</th><th>Afd.</th>"
+           + "<th>Brand på kortet</th><th>Bemærkning</th></tr></thead><tbody>";
+  let antalForslag = 0;
+  konti.forEach(function (k) {
+    const eff = effektivtBrand(k);
+    const vaerdi = Object.prototype.hasOwnProperty.call(brandUdkast, k.id) ? brandUdkast[k.id] : (k.brand || "");
+    const noter = [];
+    const soestre = (gruppe[normTekst(eff)] || []).filter(function (x) { return x.id !== k.id; });
+    if (soestre.length) noter.push('<span class="b-gruppe">samlet med ' + soestre.length + "</span> "
+      + esc(soestre.map(function (x) { return x.navn; }).join(", ")));
+    const tidl = tidligereNavn(k);
+    if (tidl) {
+      antalForslag++;
+      noter.push("Står i dag som „" + esc(tidl) + "“ på kortet"
+        + '<button class="imp-knap b-brug" type="button" data-id="' + esc(k.id) + '" data-brand="' + esc(tidl) + '">Brug</button>');
+    }
+    const o = foersteOrd(k.navn);
+    if (o && !soestre.length) {
+      const ligner = alleKonti.filter(function (x) {
+        return x.id !== k.id && (antal[x.id] || visAlle) && foersteOrd(x.navn) === o
+          && normTekst(effektivtBrand(x)) !== normTekst(eff);
+      });
+      if (ligner.length) noter.push("Ligner: " + esc(ligner.map(function (x) { return x.navn; }).join(", ")));
+    }
+    html += "<tr" + (erAendret(k) ? " class='aendret'" : "") + ">"
+      + "<td>" + esc(k.navn) + "</td>"
+      + "<td>" + esc(k.type) + "</td>"
+      + "<td>" + (antal[k.id] || 0) + "</td>"
+      + '<td><input class="brand-input" data-id="' + esc(k.id) + '" value="' + esc(vaerdi)
+      + '" placeholder="' + esc(rensKontonavn(k.navn)) + '"></td>'
+      + '<td class="b-note">' + noter.join("<br>") + "</td>"
+      + "</tr>";
+  });
+  const tabel = $("bTabel");
+  tabel.innerHTML = html + "</tbody>";
+  Array.prototype.forEach.call(tabel.querySelectorAll(".brand-input"), function (inp) {
+    inp.addEventListener("input", function () { brandUdkast[inp.dataset.id] = inp.value; opdaterBrandKnapper(); });
+    /* Tegn om når feltet forlades – efter fokus er flyttet, så det nye felt beholder fokus */
+    inp.addEventListener("change", function () {
+      setTimeout(function () {
+        const a = document.activeElement;
+        const fokusId = (a && a.classList && a.classList.contains("brand-input")) ? a.dataset.id : null;
+        tegnBrands();
+        if (fokusId) { const el = $("bTabel").querySelector('input.brand-input[data-id="' + fokusId + '"]'); if (el) el.focus(); }
+      }, 0);
+    });
+  });
+  Array.prototype.forEach.call(tabel.querySelectorAll(".b-brug"), function (b) {
+    b.addEventListener("click", function () { brandUdkast[b.dataset.id] = b.dataset.brand; tegnBrands(); });
+  });
+  $("bBrugForslag").disabled = antalForslag === 0;
+  $("bInfo").textContent = konti.length + " medlemmer vist" + (antalForslag ? " · " + antalForslag + " står med et andet navn på kortet" : "");
+  opdaterBrandKnapper();
+}
+function aendredeKonti() { return alleKonti.filter(erAendret); }
+function opdaterBrandKnapper() {
+  const n = aendredeKonti().length;
+  $("bGem").disabled = n === 0;
+  $("bFortryd").disabled = n === 0;
+  $("bGem").textContent = n ? "Gem " + n + " ændring(er)" : "Gem ændringer";
+}
+async function gemBrands() {
+  const konti = aendredeKonti();
+  if (!konti.length) return;
+  $("bGem").disabled = true;
+  $("bGemInfo").textContent = "Gemmer …";
+  $("bKvit").innerHTML = "";
+  try {
+    /* 1. Kontoerne */
+    const kontoData = konti.map(function (k) {
+      const d = { id: String(k.id) };
+      d[CONFIG.konto.brandFelt] = String(brandUdkast[k.id]).trim() || null;
+      return d;
+    });
+    const res = await opdaterPoster("Accounts", kontoData);
+    konti.forEach(function (k) {
+      if (res.ok.indexOf(String(k.id)) === -1) return;
+      k.brand = String(brandUdkast[k.id]).trim();
+      if (kontoMap[k.id]) kontoMap[k.id].brand = k.brand;
+      delete brandUdkast[k.id];
+    });
+    /* 2. Kopien i afdelingernes Brand-felt */
+    const okSet = {};
+    res.ok.forEach(function (id) { okSet[id] = true; });
+    const afd = alleRecords.filter(function (r) {
+      const m = F(r, "medlem");
+      return m && okSet[String(m.id)] && String(F(r, "brand") || "") !== brandForAfd(r);
+    }).map(function (r) {
+      const d = { id: String(r.id) };
+      d[CONFIG.felter.brand] = brandForAfd(r);
+      return d;
+    });
+    const resAfd = afd.length ? await opdaterPoster(CONFIG.modul, afd) : { ok: [], fejl: [] };
+    alleRecords.forEach(function (r) { if (resAfd.ok.indexOf(String(r.id)) !== -1) r[CONFIG.felter.brand] = brandForAfd(r); });
+    const k = $("bKvit");
+    const fejl = res.fejl.concat(resAfd.fejl);
+    k.className = fejl.length ? "imp-kvit fejl" : "imp-kvit";
+    let tekst = "<strong>" + res.ok.length + " brand(s) gemt.</strong> " + resAfd.ok.length
+      + " afdeling(er) har fået rettet feltet Brand, så CRM's egne visninger passer.";
+    if (fejl.length) {
+      tekst += "<br><br>" + fejl.length + " blev afvist: " + fejl.slice(0, 4).map(esc).join("; ");
+      if (fejl.some(function (f) { return /INVALID_DATA|felt:|api_name/i.test(f); })) {
+        tekst += "<br>Tjek at feltet „" + esc(CONFIG.konto.brandFelt) + "“ findes på Konti med præcis det API-navn.";
+      }
+    }
+    k.innerHTML = tekst;
+  } catch (e) {
+    console.error("Gem brands fejlede:", e);
+    const k = $("bKvit");
+    k.className = "imp-kvit fejl";
+    k.textContent = "Gem fejlede: " + zohoFejlTekst(e) + " – tjek at feltet „" + CONFIG.konto.brandFelt
+      + "“ findes på Konti med præcis det API-navn.";
+  } finally {
+    $("bGemInfo").textContent = "";
+    genopbygFiltre(); tegnTabel(); tegnBrands();
+  }
+}
+function opsaetBrands() {
+  brandsKlar = true;
+  $("bSoeg").addEventListener("input", tegnBrands);
+  $("bAlle").addEventListener("change", tegnBrands);
+  $("bGem").addEventListener("click", gemBrands);
+  $("bFortryd").addEventListener("click", function () {
+    Object.keys(brandUdkast).forEach(function (k) { delete brandUdkast[k]; });
+    tegnBrands();
+  });
+  $("bBrugForslag").addEventListener("click", function () {
+    alleKonti.forEach(function (k) { const t = tidligereNavn(k); if (t) brandUdkast[k.id] = t; });
+    tegnBrands();
+  });
+  tegnBrands();
+}
+
 function skiftFane(navn) {
   $("visOversigt").hidden = navn !== "oversigt";
   $("visOpret").hidden    = navn !== "opret";
   $("visMasse").hidden    = navn !== "masse";
+  $("visBrands").hidden   = navn !== "brands";
   $("faneOversigt").classList.toggle("aktiv", navn === "oversigt");
   $("faneOpret").classList.toggle("aktiv", navn === "opret");
   $("faneMasse").classList.toggle("aktiv", navn === "masse");
+  $("faneBrands").classList.toggle("aktiv", navn === "brands");
 }
 async function vedPageLoad(data) {
   if (startTimeout) { clearTimeout(startTimeout); startTimeout = null; }
@@ -1346,14 +1903,16 @@ async function vedPageLoad(data) {
         if (k && k.data && k.data[0]) ctx.kontoNavn = k.data[0].Account_Name || "";
       } catch (e) { console.warn("Kunne ikke hente kontonavn:", e); }
     }
-    skjulBesked(); opsaetOversigt(); opsaetOpret(); opsaetMasse();
+    skjulBesked(); opsaetOversigt(); opsaetOpret(); opsaetMasse(); opsaetBrands();
     if (hentAdvarsel) visBesked("⚠ " + hentAdvarsel);
+    else if (!kontiKomplet) visBesked("⚠ Ikke alle konti kunne hentes, så nogle afdelinger kan ikke tjekkes for medlemskab.");
   } catch (fejl) { visFejl(fejl); }
 }
 document.addEventListener("DOMContentLoaded", function () {
   $("faneOversigt").addEventListener("click", function () { skiftFane("oversigt"); });
   $("faneOpret").addEventListener("click", function () { skiftFane("opret"); });
   $("faneMasse").addEventListener("click", function () { skiftFane("masse"); });
+  $("faneBrands").addEventListener("click", function () { skiftFane("brands"); });
   document.addEventListener("click", function (e) {
     const ms = $("msMedlemstype"); if (ms && ms.open && !ms.contains(e.target)) ms.open = false;
   });
